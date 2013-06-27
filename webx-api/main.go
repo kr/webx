@@ -2,7 +2,14 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
+	"github.com/gorilla/mux"
+	"io"
+	"log"
+	"net/http"
+	"os"
 )
 
 const ProvisionMessage = `
@@ -11,24 +18,31 @@ See http://git.io/51G0dQ
 `
 
 func main() {
-	http.HandleFunc("/heroku/resources", Create)
-	http.HandleFunc("/heroku/resources/", Delete)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	r := NewRouter()
+	http.ListenAndServe(":"+port, r)
+}
+
+func NewRouter() *mux.Router {
+	r := mux.NewRouter()
+	r.HandleFunc("/heroku/resources", Create).
+		Methods("POST")
+	r.HandleFunc("/heroku/resources", Delete).
+		Methods("DELETE")
+	return r
 }
 
 func Create(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		w.Header().Set("Allow", "POST")
-		http.Error(w, "method not allowed", 405)
-		return
-	}
-
 	var hreq struct {
 		ID      string
 		Options struct {
 			Name string
 		}
 	}
-	json.NewDecoder(r.Body).Decode(&hreq)
+	err := json.NewDecoder(r.Body).Decode(&hreq)
 	if err != nil {
 		log.Println("heroku sent invalid json:", err)
 		http.Error(w, "invalid json", 400)
@@ -39,7 +53,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid name", 400)
 		return
 	}
-	log.Println("provision", name)
+	log.Println("provision", hreq.Options.Name)
 	var out struct {
 		ID     string `json:"id"`
 		Config struct {
@@ -48,9 +62,9 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		Message string
 	}
 	out.ID = rands(10)
-	out.Config.WEBX_URL = "https://" + name + "@route.webx.io/"
-	out.Message = name + ".webxapp.io\n" + ProvisionMessage
-	w.Status(201, "created")
+	out.Config.WEBX_URL = "https://" + hreq.Options.Name + "@route.webx.io/"
+	out.Message = hreq.Options.Name + ".webxapp.io\n" + ProvisionMessage
+	w.WriteHeader(201)
 	err = json.NewEncoder(w).Encode(out)
 	if err != nil {
 		log.Println("error send response to heroku:", err)
@@ -59,12 +73,6 @@ func Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func Delete(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		w.Header().Set("Allow", "POST")
-		http.Error(w, "method not allowed", 405)
-		return
-	}
-
 	// TODO
 }
 
