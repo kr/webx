@@ -1,0 +1,17 @@
+{
+  "id": "webx",
+  "api": {
+    "config_vars": [ "WEBX_URL" ],
+    "regions": [ "us" ],
+    "password": "1f6b91ab99004e5be9d97915fe082596",
+    "sso_salt": "95e4be81bae2e82bebb0224807136244",
+    "production": {
+      "base_url": "https://yourapp.com/heroku/resources",
+      "sso_url": "https://yourapp.com/sso/login"
+    },
+    "test": {
+      "base_url": "http://localhost:4567/heroku/resources",
+      "sso_url": "http://localhost:4567/sso/login"
+    }
+  }
+}
