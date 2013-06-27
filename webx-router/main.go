@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/kr/rspdy"
 	"log"
+	"math/rand"
 )
 
 const (
@@ -113,4 +114,16 @@ func (t *Transport) Remove(name string, c *spdy.Conn) {
 
 func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	c, ok := t.Lookup(r.URL.Host)
+}
+
+func (t *Transport) Lookup(host string) (*spdy.Conn, bool) {
+	// TODO(bg): how do we go from host to "name" for the lookup?
+	name := host
+	// TODO(bg): do we copy the conns like this, or use a Mutex for safety?
+	conns := make([]*spdy.Conn, len(t.tab[name]))
+	num := copy(conns, t.tab[name])
+	if num == 0 {
+		return nil, false
+	}
+	return conns[rand.Intn(num)], true
 }
