@@ -4,6 +4,7 @@ import (
 	"github.com/kr/rspdy"
 	"log"
 	"math/rand"
+	"strings"
 )
 
 const (
@@ -112,18 +113,22 @@ func (t *Transport) Remove(name string, c *spdy.Conn) {
 	t.tab[name] = b
 }
 
-func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
-	c, ok := t.Lookup(r.URL.Host)
+func (t *Transport) Lookup(host string) []*spdy.Conn {
+	name := strings.TrimSuffix(host, ".webxapp.io")
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	return t.tab[name]
 }
 
-func (t *Transport) Lookup(host string) (*spdy.Conn, bool) {
-	// TODO(bg): how do we go from host to "name" for the lookup?
-	name := host
-	// TODO(bg): do we copy the conns like this, or use a Mutex for safety?
-	conns := make([]*spdy.Conn, len(t.tab[name]))
-	num := copy(conns, t.tab[name])
-	if num == 0 {
-		return nil, false
+func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
+	conns := t.Lookup(r.URL.Host)
+
+	if len(conns) == 0 {
+		return &http.Response{StatusCode: 503}, nil
 	}
-	return conns[rand.Intn(num)], true
+	// TODO(kr): do something smarter than rand
+	c := conns[rand.Intn(num)]
+	return c.RoundTrip(r)
 }
