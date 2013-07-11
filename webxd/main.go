@@ -3,12 +3,16 @@
 //   PORT     - port to send requests to
 //   WEBX_URL - location and credentials for RSPDY connection
 //              e.g. https://foo@route.webx.io/
+//
+// Optional Environment:
+//   WEBX_VERBOSE - log extra information
 package main
 
 import (
 	"crypto/tls"
 	"encoding/json"
 	"github.com/kr/rspdy"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -22,7 +26,6 @@ var tlsConfig = &tls.Config{
 
 func main() {
 	log.SetFlags(0)
-	log.SetFlags(log.Lshortfile|log.LstdFlags)
 	log.SetPrefix("webxd: ")
 	innerAddr := ":" + os.Getenv("PORT")
 	routerURL, err := url.Parse(os.Getenv("WEBX_URL"))
@@ -42,11 +45,48 @@ func main() {
 	}
 
 	innerURL := &url.URL{Scheme: "http", Host: innerAddr}
-	http.Handle("/", httputil.NewSingleHostReverseProxy(innerURL))
+	rp := httputil.NewSingleHostReverseProxy(innerURL)
+	http.Handle("/", LogHandler{rp})
 	http.HandleFunc("backend.webx.io/names", handshake)
+	if os.Getenv("WEBX_VERBOSE") == "" {
+		log.SetOutput(ioutil.Discard)
+	}
 	err = rspdy.DialAndServeTLS("tcp", routerURL.Host, tlsConfig, nil)
 	if err != nil {
+		log.SetOutput(os.Stderr)
 		log.Fatal("DialAndServe:", err)
+	}
+}
+
+type LogHandler struct {
+	http.Handler
+}
+
+func (h LogHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w = &LogResponseWriter{ResponseWriter: w, r: r}
+	h.Handler.ServeHTTP(w, r)
+}
+
+type LogResponseWriter struct {
+	http.ResponseWriter
+	r      *http.Request
+	logged bool
+}
+
+func (w *LogResponseWriter) Write(p []byte) (int, error) {
+	w.log(http.StatusOK)
+	return w.ResponseWriter.Write(p)
+}
+
+func (w *LogResponseWriter) WriteHeader(code int) {
+	w.log(code)
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *LogResponseWriter) log(code int) {
+	if !w.logged {
+		w.logged = true
+		log.Println(code, w.r.Host, w.r.URL.Path)
 	}
 }
 
