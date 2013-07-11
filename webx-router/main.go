@@ -1,18 +1,39 @@
 package main
 
 import (
+	"encoding/json"
 	"github.com/kr/rspdy"
+	"github.com/kr/spdy"
+	"io"
 	"log"
 	"math/rand"
+	"net/http"
+	"net/http/httputil"
 	"strings"
+	"sync"
 )
 
 const (
-	requestAddr = "1.2.3.4:80"
-	backendAddr = "5.6.7.8:443"
+	requestAddr = ":8000"
+	backendAddr = ":4444"
+	certFile    = "route.webx.io.crt.pem"
+	keyFile     = "route.webx.io.key.pem"
 )
 
+var empty emptyReadCloser
+
+type emptyReadCloser int
+
+func (e emptyReadCloser) Read(p []byte) (int, error) {
+	return 0, io.EOF
+}
+
+func (e emptyReadCloser) Close() error {
+	return nil
+}
+
 func main() {
+	log.SetFlags(log.Lshortfile|log.LstdFlags)
 	p := NewProxy()
 	go listenBackends(p)
 	go listenRequests(p)
@@ -25,7 +46,7 @@ func listenBackends(p *Proxy) {
 		log.Fatal(err)
 	}
 	for {
-		c, err := l.Accept()
+		c, err := l.AcceptSPDY()
 		if err != nil {
 			log.Fatal("error: accept", err)
 		}
@@ -34,12 +55,13 @@ func listenBackends(p *Proxy) {
 }
 
 func handshakeBackend(c *spdy.Conn, p *Proxy) {
-	resp, err := c.Get("https://backend.webx.io/names")
+	client := &http.Client{Transport: c}
+	resp, err := client.Get("https://backend.webx.io/names")
 	if err != nil {
 		log.Println("error: get backend names:", err)
 		return
 	}
-	if resp.Status != 200 {
+	if resp.StatusCode != 200 {
 		log.Println("error: get backend names http status", resp.Status)
 		return
 	}
@@ -57,9 +79,11 @@ func handshakeBackend(c *spdy.Conn, p *Proxy) {
 		// TODO(kr): authenticate command as discussed
 		switch cmd.Op {
 		case "add":
-			p.tr.Add(cmd.Name, c)
+			log.Println("add", cmd.Name)
+			p.tr.Lookup(cmd.Name, true).Add(c)
 		case "remove":
-			p.tr.Remove(cmd.Name, c)
+			log.Println("remove", cmd.Name)
+			p.tr.Lookup(cmd.Name, true).Remove(c)
 		}
 	}
 }
@@ -71,7 +95,7 @@ type BackendCommand struct {
 
 func listenRequests(p *Proxy) {
 	// TODO(kr): TLS
-	err := http.ListenAndServe(requestAddr, p.rp)
+	err := http.ListenAndServe(requestAddr, &p.rp)
 	if err != nil {
 		log.Fatal("error: frontend ListenAndServe:", err)
 	}
@@ -84,51 +108,72 @@ type Proxy struct {
 
 func NewProxy() (p *Proxy) {
 	p = new(Proxy)
-	p.tr.tab = make(map[string]*spdy.Conn)
+	p.tr.tab = make(map[string]*Group)
+	p.rp.Director = func(*http.Request) {}
 	p.rp.Transport = &p.tr
 	return p
 }
 
 type Transport struct {
-	tab map[string][]*spdy.Conn
+	tab map[string]*Group
 	mu  sync.Mutex
 }
 
-func (t *Transport) Add(name string, c *spdy.Conn) {
+func (t *Transport) Lookup(name string, create bool) *Group {
+	log.Println("lookup", name)
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.tab[name] = append(t.tab[name], c)
+	g := t.tab[name]
+	if g == nil && create {
+		g = new(Group)
+		t.tab[name] = g
+	}
+	return g
 }
 
-func (t *Transport) Remove(name string, c *spdy.Conn) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	a := t.tab[name]
+func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
+	name := strings.TrimSuffix(r.Host, ".webxapp.io")
+	g := t.Lookup(name, false)
+	if g == nil {
+		return &http.Response{StatusCode: 503, Body: empty}, nil
+	}
+	log.Println("roundtrip", name)
+	return g.RoundTrip(r)
+}
+
+type Group struct {
+	backends []*spdy.Conn
+	mu sync.Mutex
+}
+
+func (g *Group) RoundTrip(r *http.Request) (*http.Response, error) {
+	g.mu.Lock()
+	if len(g.backends) == 0 {
+		g.mu.Unlock()
+		return &http.Response{StatusCode: 503, Body: empty}, nil
+	}
+	// TODO(kr): do something smarter than rand
+	c := g.backends[rand.Intn(len(g.backends))]
+	g.mu.Unlock()
+	log.Println("spdy roundtrip", r.Host)
+	return c.RoundTrip(r)
+}
+
+func (g *Group) Add(c *spdy.Conn) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.backends = append(g.backends, c)
+}
+
+func (g *Group) Remove(c *spdy.Conn) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	a := g.backends
 	var b []*spdy.Conn
 	for i := range a {
 		if a[i] != c {
 			b = append(b, a[i])
 		}
 	}
-	t.tab[name] = b
-}
-
-func (t *Transport) Lookup(host string) []*spdy.Conn {
-	name := strings.TrimSuffix(host, ".webxapp.io")
-
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	return t.tab[name]
-}
-
-func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
-	conns := t.Lookup(r.URL.Host)
-
-	if len(conns) == 0 {
-		return &http.Response{StatusCode: 503}, nil
-	}
-	// TODO(kr): do something smarter than rand
-	c := conns[rand.Intn(num)]
-	return c.RoundTrip(r)
+	g.backends = b
 }
