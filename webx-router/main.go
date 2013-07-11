@@ -9,15 +9,16 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httputil"
+	"os"
 	"strings"
 	"sync"
 )
 
 const (
-	requestAddr = ":8000"
-	backendAddr = ":4444"
-	certFile    = "route.webx.io.crt.pem"
-	keyFile     = "route.webx.io.key.pem"
+	defRequestAddr = ":8000" // REQADDR
+	defBackendAddr = ":4444" // BKDADDR
+	certFile       = "route.webx.io.crt.pem"
+	keyFile        = "route.webx.io.key.pem"
 )
 
 var empty emptyReadCloser
@@ -33,7 +34,7 @@ func (e emptyReadCloser) Close() error {
 }
 
 func main() {
-	log.SetFlags(log.Lshortfile|log.LstdFlags)
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	p := NewProxy()
 	go listenBackends(p)
 	go listenRequests(p)
@@ -41,7 +42,11 @@ func main() {
 }
 
 func listenBackends(p *Proxy) {
-	l, err := rspdy.ListenTLS(backendAddr, certFile, keyFile)
+	addr := os.Getenv("BKDADDR")
+	if addr == "" {
+		addr = defBackendAddr
+	}
+	l, err := rspdy.ListenTLS(addr, certFile, keyFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -95,7 +100,11 @@ type BackendCommand struct {
 
 func listenRequests(p *Proxy) {
 	// TODO(kr): TLS
-	err := http.ListenAndServe(requestAddr, &p.rp)
+	addr := os.Getenv("REQADDR")
+	if addr == "" {
+		addr = defRequestAddr
+	}
+	err := http.ListenAndServe(addr, &p.rp)
 	if err != nil {
 		log.Fatal("error: frontend ListenAndServe:", err)
 	}
@@ -143,7 +152,7 @@ func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 
 type Group struct {
 	backends []*spdy.Conn
-	mu sync.Mutex
+	mu       sync.Mutex
 }
 
 func (g *Group) RoundTrip(r *http.Request) (*http.Response, error) {
