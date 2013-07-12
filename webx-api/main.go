@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/gorilla/mux"
 	"io"
 	"log"
 	"net/http"
@@ -31,13 +30,11 @@ func main() {
 	http.ListenAndServe(":"+port, r)
 }
 
-func NewRouter() *mux.Router {
-	r := mux.NewRouter()
-	r.HandleFunc("/heroku/resources", Create).
-		Methods("POST")
-	r.HandleFunc("/heroku/resources/{id}", Delete).
-		Methods("DELETE")
-	return r
+func NewRouter() http.Handler {
+	h := http.NewServeMux()
+	h.HandleFunc("/heroku/resources", Create)
+	h.Handle("/heroku/resources/", http.StripPrefix("/heroku/resources/", http.HandlerFunc(Delete)))
+	return h
 }
 
 type provisionreq struct {
@@ -54,6 +51,11 @@ type provisionopts struct {
 }
 
 func Create(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, "Method Not Allowed", 405)
+	}
+
 	if !authenticate(r) {
 		log.Println("auth failure")
 		w.WriteHeader(401)
@@ -92,13 +94,18 @@ func Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func Delete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "DELETE" {
+		w.Header().Set("Allow", "DELETE")
+		http.Error(w, "Method Not Allowed", 405)
+	}
+
 	if !authenticate(r) {
 		log.Println("auth failure")
 		w.WriteHeader(401)
 		return
 	}
 
-	id := mux.Vars(r)["id"]
+	id := r.URL.Path
 	log.Println("deprovision", id)
 	w.WriteHeader(200)
 }
