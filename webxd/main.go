@@ -12,7 +12,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"github.com/kr/rspdy"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -24,6 +23,8 @@ import (
 const (
 	redialPause = 2 * time.Second
 )
+
+var verbose bool
 
 var tlsConfig = &tls.Config{
 	InsecureSkipVerify: true,
@@ -53,8 +54,8 @@ func main() {
 	rp := httputil.NewSingleHostReverseProxy(innerURL)
 	http.Handle("/", LogHandler{rp})
 	http.HandleFunc("backend.webx.io/names", handshake)
-	if os.Getenv("WEBX_VERBOSE") == "" {
-		log.SetOutput(ioutil.Discard)
+	if os.Getenv("WEBX_VERBOSE") != "" {
+		verbose = true
 	}
 	for {
 		err = rspdy.DialAndServeTLS("tcp", routerURL.Host, tlsConfig, nil)
@@ -93,7 +94,7 @@ func (w *LogResponseWriter) WriteHeader(code int) {
 func (w *LogResponseWriter) log(code int) {
 	if !w.logged {
 		w.logged = true
-		log.Println(code, w.r.Host, w.r.URL.Path)
+		Infoln(code, w.r.Host, w.r.URL.Path)
 	}
 }
 
@@ -118,4 +119,10 @@ func mustSanityCheckURL(u *url.URL) {
 type BackendCommand struct {
 	Op   string // "add" or "remove"
 	Name string // e.g. "foo" for foo.webxapp.io
+}
+
+func Infoln(v ...interface{}) {
+	if verbose {
+		log.Println(v...)
+	}
 }
