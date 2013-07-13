@@ -43,6 +43,7 @@ func listenRequests(t *Transport) {
 	if err != nil {
 		log.Fatal("error: frontend ListenAndServe:", err)
 	}
+	panic("unreached")
 }
 
 func listenBackends(t *Transport) {
@@ -58,7 +59,8 @@ func listenBackends(t *Transport) {
 	for {
 		c, err := l.AcceptSPDY()
 		if err != nil {
-			log.Fatal("error: accept", err)
+			log.Println("accept spdy", err)
+			continue
 		}
 		go handshakeBackend(c, t)
 	}
