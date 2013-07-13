@@ -18,6 +18,11 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"time"
+)
+
+const (
+	redialPause = 2 * time.Second
 )
 
 var tlsConfig = &tls.Config{
@@ -51,10 +56,12 @@ func main() {
 	if os.Getenv("WEBX_VERBOSE") == "" {
 		log.SetOutput(ioutil.Discard)
 	}
-	err = rspdy.DialAndServeTLS("tcp", routerURL.Host, tlsConfig, nil)
-	if err != nil {
-		log.SetOutput(os.Stderr)
-		log.Fatal("DialAndServe:", err)
+	for {
+		err = rspdy.DialAndServeTLS("tcp", routerURL.Host, tlsConfig, nil)
+		if err != nil {
+			log.Println("DialAndServe:", err)
+			time.Sleep(redialPause)
+		}
 	}
 }
 
