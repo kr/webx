@@ -25,8 +25,9 @@ const username = "webx"
 const password = "1f6b91ab99004e5be9d97915fe082596"
 
 var (
-	dynoProfile = mustReadFile("webxd/dyno-profile.sh")
-	webxdBinary = mustReadPath("webxd")
+	dynoProfile  = mustReadFile("webxd/dyno-profile.sh")
+	webxdBinary  = mustReadPath("webxd")
+	routerBinary = mustReadPath("webx-router")
 )
 
 func main() {
@@ -47,6 +48,7 @@ func NewRouter() *mux.Router {
 	r.Handle("/", staticHandler("webx\n")).Methods("GET", "HEAD")
 	r.Handle("/dyno-profile.sh", staticHandler(dynoProfile)).Methods("GET", "HEAD")
 	r.Handle("/webxd", staticHandler(webxdBinary)).Methods("GET", "HEAD")
+	r.Handle("/webx-router", staticHandler(routerBinary)).Methods("GET", "HEAD")
 	return r
 }
 
