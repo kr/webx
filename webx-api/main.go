@@ -8,9 +8,11 @@ import (
 	"encoding/json"
 	"github.com/gorilla/mux"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -21,6 +23,11 @@ See http://git.io/51G0dQ
 
 const username = "webx"
 const password = "1f6b91ab99004e5be9d97915fe082596"
+
+var (
+	dynoProfile = mustReadFile("webxd/dyno-profile.sh")
+	webxdBinary = mustReadPath("webxd")
+)
 
 func main() {
 	port := os.Getenv("PORT")
@@ -37,7 +44,9 @@ func NewRouter() *mux.Router {
 		Methods("POST")
 	r.HandleFunc("/heroku/resources/{id}", Delete).
 		Methods("DELETE")
-	r.HandleFunc("/", Home).Methods("GET")
+	r.Handle("/", staticHandler("webx\n")).Methods("GET", "HEAD")
+	r.Handle("/dyno-profile.sh", staticHandler(dynoProfile)).Methods("GET", "HEAD")
+	r.Handle("/webxd", staticHandler(webxdBinary)).Methods("GET", "HEAD")
 	return r
 }
 
@@ -104,8 +113,10 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-func Home(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "webx")
+type staticHandler []byte
+
+func (h staticHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Write(h)
 }
 
 func authenticate(r *http.Request) bool {
@@ -137,4 +148,20 @@ func rands(n int) string {
 		panic(err)
 	}
 	return hex.EncodeToString(b)
+}
+
+func mustReadFile(name string) []byte {
+	b, err := ioutil.ReadFile(name)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return b
+}
+
+func mustReadPath(name string) []byte {
+	path, err := exec.LookPath(name)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return mustReadFile(path)
 }
