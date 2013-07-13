@@ -11,7 +11,7 @@ web.*) ;;
 esac
 set -e
 
-curl -so /tmp/webxd https://api.webx.io/webxd
+curl -so /tmp/webxd http://api.webx.io/webxd
 chmod +x /tmp/webxd
 /tmp/webxd &
 rm -f /tmp/webxd
