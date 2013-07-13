@@ -6,12 +6,9 @@ import (
 	"github.com/kr/spdy"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"net/http/httputil"
 	"os"
-	"strings"
-	"sync"
 )
 
 const (
@@ -23,29 +20,37 @@ const (
 
 var empty emptyReadCloser
 
-type emptyReadCloser int
-
-func (e emptyReadCloser) Read(p []byte) (int, error) {
-	return 0, io.EOF
-}
-
-func (e emptyReadCloser) Close() error {
-	return nil
-}
-
 func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
-	p := NewProxy()
-	go listenBackends(p)
-	go listenRequests(p)
+	t := &Transport{tab: make(map[string]*Group)}
+	go listenBackends(t)
+	go listenRequests(t)
 	select {}
 }
 
-func listenBackends(p *Proxy) {
+func listenRequests(t *Transport) {
+	// TODO(kr): TLS
+	addr := os.Getenv("REQADDR")
+	if addr == "" {
+		addr = defRequestAddr
+	}
+	proxy := &httputil.ReverseProxy{
+		Transport: t,
+		Director:  func(*http.Request) {},
+	}
+	log.Println("listen requests", addr)
+	err := http.ListenAndServe(addr, proxy)
+	if err != nil {
+		log.Fatal("error: frontend ListenAndServe:", err)
+	}
+}
+
+func listenBackends(t *Transport) {
 	addr := os.Getenv("BKDADDR")
 	if addr == "" {
 		addr = defBackendAddr
 	}
+	log.Println("listen backends", addr)
 	l, err := rspdy.ListenTLS(addr, certFile, keyFile)
 	if err != nil {
 		log.Fatal(err)
@@ -55,11 +60,11 @@ func listenBackends(p *Proxy) {
 		if err != nil {
 			log.Fatal("error: accept", err)
 		}
-		go handshakeBackend(c, p)
+		go handshakeBackend(c, t)
 	}
 }
 
-func handshakeBackend(c *spdy.Conn, p *Proxy) {
+func handshakeBackend(c *spdy.Conn, t *Transport) {
 	client := &http.Client{Transport: c}
 	resp, err := client.Get("https://backend.webx.io/names")
 	if err != nil {
@@ -70,7 +75,13 @@ func handshakeBackend(c *spdy.Conn, p *Proxy) {
 		log.Println("error: get backend names http status", resp.Status)
 		return
 	}
-	// TODO(kr): defer remove c from p
+	var names []string
+	defer func() {
+		for _, s := range names {
+			log.Println("remove", s)
+			t.Remove(s, c)
+		}
+	}()
 	d := json.NewDecoder(resp.Body)
 	var cmd BackendCommand
 	for {
@@ -85,10 +96,26 @@ func handshakeBackend(c *spdy.Conn, p *Proxy) {
 		switch cmd.Op {
 		case "add":
 			log.Println("add", cmd.Name)
-			p.tr.Lookup(cmd.Name, true).Add(c)
+			t.Make(cmd.Name).Add(c)
+			found := false
+			for _, s := range names {
+				if s == cmd.Name {
+					found = true
+				}
+			}
+			if !found {
+				names = append(names, cmd.Name)
+			}
 		case "remove":
 			log.Println("remove", cmd.Name)
-			p.tr.Lookup(cmd.Name, true).Remove(c)
+			t.Remove(cmd.Name, c)
+			var a []string
+			for i := range names {
+				if names[i] != cmd.Name {
+					a = append(a, names[i])
+				}
+			}
+			names = a
 		}
 	}
 }
@@ -98,91 +125,12 @@ type BackendCommand struct {
 	Name string // e.g. "foo" for foo.webxapp.io
 }
 
-func listenRequests(p *Proxy) {
-	// TODO(kr): TLS
-	addr := os.Getenv("REQADDR")
-	if addr == "" {
-		addr = defRequestAddr
-	}
-	err := http.ListenAndServe(addr, &p.rp)
-	if err != nil {
-		log.Fatal("error: frontend ListenAndServe:", err)
-	}
+type emptyReadCloser int
+
+func (e emptyReadCloser) Read(p []byte) (int, error) {
+	return 0, io.EOF
 }
 
-type Proxy struct {
-	rp httputil.ReverseProxy
-	tr Transport
-}
-
-func NewProxy() (p *Proxy) {
-	p = new(Proxy)
-	p.tr.tab = make(map[string]*Group)
-	p.rp.Director = func(*http.Request) {}
-	p.rp.Transport = &p.tr
-	return p
-}
-
-type Transport struct {
-	tab map[string]*Group
-	mu  sync.Mutex
-}
-
-func (t *Transport) Lookup(name string, create bool) *Group {
-	log.Println("lookup", name)
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	g := t.tab[name]
-	if g == nil && create {
-		g = new(Group)
-		t.tab[name] = g
-	}
-	return g
-}
-
-func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
-	name := strings.TrimSuffix(r.Host, ".webxapp.io")
-	g := t.Lookup(name, false)
-	if g == nil {
-		return &http.Response{StatusCode: 503, Body: empty}, nil
-	}
-	log.Println("roundtrip", name)
-	return g.RoundTrip(r)
-}
-
-type Group struct {
-	backends []*spdy.Conn
-	mu       sync.Mutex
-}
-
-func (g *Group) RoundTrip(r *http.Request) (*http.Response, error) {
-	g.mu.Lock()
-	if len(g.backends) == 0 {
-		g.mu.Unlock()
-		return &http.Response{StatusCode: 503, Body: empty}, nil
-	}
-	// TODO(kr): do something smarter than rand
-	c := g.backends[rand.Intn(len(g.backends))]
-	g.mu.Unlock()
-	log.Println("spdy roundtrip", r.Host)
-	return c.RoundTrip(r)
-}
-
-func (g *Group) Add(c *spdy.Conn) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.backends = append(g.backends, c)
-}
-
-func (g *Group) Remove(c *spdy.Conn) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	a := g.backends
-	var b []*spdy.Conn
-	for i := range a {
-		if a[i] != c {
-			b = append(b, a[i])
-		}
-	}
-	g.backends = b
+func (e emptyReadCloser) Close() error {
+	return nil
 }
