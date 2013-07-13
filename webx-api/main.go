@@ -37,6 +37,7 @@ func NewRouter() *mux.Router {
 		Methods("POST")
 	r.HandleFunc("/heroku/resources/{id}", Delete).
 		Methods("DELETE")
+	r.HandleFunc("/", Home).Methods("GET")
 	return r
 }
 
@@ -101,6 +102,10 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	log.Println("deprovision", id)
 	w.WriteHeader(200)
+}
+
+func Home(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, "webx")
 }
 
 func authenticate(r *http.Request) bool {
