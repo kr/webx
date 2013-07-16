@@ -21,7 +21,7 @@ See http://git.io/51G0dQ
 `
 
 const username = "webx"
-const password = "1f6b91ab99004e5be9d97915fe082596"
+const password = os.Getenv("HEROKU_PASSWORD")
 
 func main() {
 	port := os.Getenv("PORT")
