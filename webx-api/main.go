@@ -21,13 +21,14 @@ See http://git.io/51G0dQ
 `
 
 const username = "webx"
-const password = os.Getenv("HEROKU_PASSWORD")
+var password string
 
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
+	password = os.Getenv("HEROKU_PASSWORD")
 	r := NewRouter()
 	http.ListenAndServe(":"+port, r)
 }
