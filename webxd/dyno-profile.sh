@@ -5,7 +5,7 @@
 # If we return, the dyno will continue booting.
 # If we exit, the dyno will crash.
 
-case "$PS" in
+case "$DYNO" in
 web.*) ;;
 *    ) return ;;
 esac
