@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"github.com/gorilla/mux"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -24,12 +23,6 @@ See http://git.io/51G0dQ
 const username = "webx"
 const password = "1f6b91ab99004e5be9d97915fe082596"
 
-var (
-	dynoProfile  = mustReadFile("webxd/dyno-profile.sh")
-	webxdBinary  = mustReadPath("webxd")
-	routerBinary = mustReadPath("webx-router")
-)
-
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -40,15 +33,24 @@ func main() {
 }
 
 func NewRouter() *mux.Router {
+	webxdPath, err := exec.LookPath("webxd")
+	if err != nil {
+		log.Fatal(err)
+	}
+	routerPath, err := exec.LookPath("webx-router")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	r := mux.NewRouter()
 	r.HandleFunc("/heroku/resources", Create).
 		Methods("POST")
 	r.HandleFunc("/heroku/resources/{id}", Delete).
 		Methods("DELETE")
-	r.Handle("/", staticHandler("webx\n")).Methods("GET", "HEAD")
-	r.Handle("/dyno-profile.sh", staticHandler(dynoProfile)).Methods("GET", "HEAD")
-	r.Handle("/webxd", staticHandler(webxdBinary)).Methods("GET", "HEAD")
-	r.Handle("/webx-router", staticHandler(routerBinary)).Methods("GET", "HEAD")
+	r.HandleFunc("/", Home).Methods("GET", "HEAD")
+	r.Handle("/dyno-profile.sh", fileHandler("webxd/dyno-profile.sh")).Methods("GET", "HEAD")
+	r.Handle("/webxd", fileHandler(webxdPath)).Methods("GET", "HEAD")
+	r.Handle("/webx-router", fileHandler(routerPath)).Methods("GET", "HEAD")
 	return r
 }
 
@@ -115,10 +117,14 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-type staticHandler []byte
+func Home(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, "webx\n")
+}
 
-func (h staticHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Write(h)
+type fileHandler string
+
+func (h fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, string(h))
 }
 
 func authenticate(r *http.Request) bool {
@@ -150,20 +156,4 @@ func rands(n int) string {
 		panic(err)
 	}
 	return hex.EncodeToString(b)
-}
-
-func mustReadFile(name string) []byte {
-	b, err := ioutil.ReadFile(name)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return b
-}
-
-func mustReadPath(name string) []byte {
-	path, err := exec.LookPath(name)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return mustReadFile(path)
 }
