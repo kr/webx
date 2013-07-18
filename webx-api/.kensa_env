@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# source this file before running the API to test it against Kensa
+export HEROKU_PASSWORD="1f6b91ab99004e5be9d97915fe082596"
+export ECDSA_BITS="256"
+export ECDSA_PRIVATE_KEY="0IHMZ-cHVDx8tHWJLTuViLiI2knUEoBzYzckkMinOUE="
+export PORT=4567
