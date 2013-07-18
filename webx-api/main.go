@@ -21,6 +21,7 @@ See http://git.io/51G0dQ
 `
 
 const username = "webx"
+
 var password string
 
 func main() {

@@ -9,6 +9,7 @@ import (
 	"testing"
 )
 
+// Benchmarks of Gorilla's mux vs. DefaultServeMux
 func fakehandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
