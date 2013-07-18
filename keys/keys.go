@@ -75,3 +75,19 @@ func VerifySignedUser(user, signature string, pub *ecdsa.PublicKey) (bool, error
 
 	return ecdsa.Verify(pub, sha512.New().Sum([]byte(user)), r, s), nil
 }
+
+func ParseCurveBits(bits int) (curve elliptic.Curve, err error) {
+	switch bits {
+	case 224:
+		curve = elliptic.P224()
+	case 256:
+		curve = elliptic.P256()
+	case 384:
+		curve = elliptic.P384()
+	case 521:
+		curve = elliptic.P521()
+	default:
+		return nil, fmt.Errorf("invalid bitsize: %d", bits)
+	}
+	return curve, nil
+}

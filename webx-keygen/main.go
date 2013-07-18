@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"flag"
 	"fmt"
@@ -15,7 +14,11 @@ var curveBits = flag.Int("bits", 256, "number of elliptic curve bits [224, 256, 
 
 func main() {
 	flag.Parse()
-	curve := parseCurveBits(*curveBits)
+	curve, err := keys.ParseCurveBits(*curveBits)
+	if err != nil {
+		flag.Usage()
+		os.Exit(0)
+	}
 
 	// random number of keys to generate
 	iterationsBig, _ := rand.Int(rand.Reader, big.NewInt(200))
@@ -23,7 +26,6 @@ func main() {
 	fmt.Printf("Generating %d keys...\n", iterations)
 
 	var priv *ecdsa.PrivateKey
-	var err error
 	for i := 0; i < iterations; i++ {
 		priv, err = ecdsa.GenerateKey(curve, rand.Reader)
 		if err != nil {
@@ -32,23 +34,6 @@ func main() {
 		}
 	}
 	printKey(priv)
-}
-
-func parseCurveBits(bits int) (curve elliptic.Curve) {
-	switch bits {
-	case 224:
-		curve = elliptic.P224()
-	case 256:
-		curve = elliptic.P256()
-	case 384:
-		curve = elliptic.P384()
-	case 521:
-		curve = elliptic.P521()
-	default:
-		flag.Usage()
-		os.Exit(1)
-	}
-	return
 }
 
 func printKey(priv *ecdsa.PrivateKey) {
