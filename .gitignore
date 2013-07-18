@@ -1,1 +1,5 @@
 *.pem
+webx-api/webx-api
+webx-keygen/webx-keygen
+webx-router/webx-router
+webxd/webxd
