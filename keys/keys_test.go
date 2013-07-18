@@ -76,7 +76,12 @@ func TestEncodeDecodeSignature(t *testing.T) {
 
 func TestSignUser(t *testing.T) {
 	key64 := "4d2028ad91408478bdfb44cfb18d0de7316290e49471ffe58691a5947d12866c"
-	_, err := SignUser("omgwtfbbq", key64, elliptic.P256())
+	kdec, err := DecodePrivateKey(key64, elliptic.P256())
+	if err != nil {
+		t.Errorf("error decoding: %s", err)
+	}
+
+	_, err = SignUser("omgwtfbbq", kdec)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -87,12 +92,12 @@ func TestVerifySignedUser(t *testing.T) {
 	priv := genTestKey(t, curve)
 	user := "omgwtfbbq"
 
-	auth, err := SignUser(user, EncodePrivateKey(*priv), curve)
+	auth, err := SignUser(user, priv)
 	if err != nil {
 		t.Fatalf("error signing user: %s", err)
 	}
 
-	success, err := VerifySignedUser(user, EncodePublicKey(priv.PublicKey), auth, curve)
+	success, err := VerifySignedUser(user, auth, &priv.PublicKey)
 	if err != nil {
 		t.Fatalf("error verifying user: %s", err)
 	}

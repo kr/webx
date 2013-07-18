@@ -56,15 +56,10 @@ func DecodeSignature(signature64 string) (r, s *big.Int, err error) {
 	return
 }
 
-func SignUser(user, key64 string, curve elliptic.Curve) (auth string, err error) {
-	priv, err := DecodePrivateKey(key64, curve)
-	if err != nil {
-		return "", err
-	}
-
+func SignUser(user string, key *ecdsa.PrivateKey) (auth string, err error) {
 	hs := sha512.New().Sum([]byte(user))
 
-	r, s, err := ecdsa.Sign(rand.Reader, priv, hs)
+	r, s, err := ecdsa.Sign(rand.Reader, key, hs)
 	if err != nil {
 		fmt.Errorf("%s error signing: %s", hs, err)
 	}
@@ -72,12 +67,7 @@ func SignUser(user, key64 string, curve elliptic.Curve) (auth string, err error)
 	return EncodeSignature(r, s), nil
 }
 
-func VerifySignedUser(user, xy64, signature string, curve elliptic.Curve) (bool, error) {
-	pub, err := DecodePublicKey(xy64, curve)
-	if err != nil {
-		return false, err
-	}
-
+func VerifySignedUser(user, signature string, pub *ecdsa.PublicKey) (bool, error) {
 	r, s, err := DecodeSignature(signature)
 	if err != nil {
 		return false, err
