@@ -2,16 +2,19 @@
 package main
 
 import (
+	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"github.com/gorilla/mux"
+	"github.com/heroku/webx/keys"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -22,7 +25,10 @@ See http://git.io/51G0dQ
 
 const username = "webx"
 
-var password string
+var (
+	password   string
+	signingKey *ecdsa.PrivateKey
+)
 
 func main() {
 	port := os.Getenv("PORT")
@@ -30,6 +36,24 @@ func main() {
 		port = "8080"
 	}
 	password = mustGetenv("HEROKU_PASSWORD")
+
+	// load elliptic curve
+	ecdsaBits, err := strconv.Atoi(mustGetenv("ECDSA_BITS"))
+	if err != nil {
+		log.Fatalf("invalid ECDSA_BITS")
+	}
+	curve, err := keys.ParseCurveBits(ecdsaBits)
+	if err != nil {
+		log.Fatalf("invalid ECDSA curve size: %s", err)
+	}
+
+	// load private signing key
+	privKeyStr := mustGetenv("ECDSA_PRIVATE_KEY")
+	signingKey, err = keys.DecodePrivateKey(privKeyStr, curve)
+	if err != nil {
+		log.Fatalf("error loading signing key: %s", err)
+	}
+
 	r := NewRouter()
 	http.ListenAndServe(":"+port, r)
 }
@@ -89,6 +113,14 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Println("provision", hreq.Options.Name)
+
+	auth, err := keys.SignUser(hreq.Options.Name, signingKey)
+	if err != nil {
+		log.Println("signing error:", err)
+		w.WriteHeader(500)
+		return
+	}
+
 	var out struct {
 		ID     string `json:"id"`
 		Config struct {
@@ -97,7 +129,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		Message string
 	}
 	out.ID = rands(10)
-	out.Config.WEBX_URL = "https://" + hreq.Options.Name + "@route.webx.io/"
+	out.Config.WEBX_URL = "https://" + hreq.Options.Name + ":" + auth + "@route.webx.io/"
 	out.Message = hreq.Options.Name + ".webxapp.io\n" + ProvisionMessage
 	w.WriteHeader(201)
 	err = json.NewEncoder(w).Encode(out)
