@@ -29,7 +29,7 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	password = os.Getenv("HEROKU_PASSWORD")
+	password = mustGetenv("HEROKU_PASSWORD")
 	r := NewRouter()
 	http.ListenAndServe(":"+port, r)
 }
@@ -140,6 +140,14 @@ func authenticate(r *http.Request) bool {
 	}
 	userpass := strings.SplitN(string(dec), ":", 2)
 	return len(userpass) == 2 && userpass[0] == username || userpass[1] == password
+}
+
+func mustGetenv(key string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		log.Fatalf("must set env %s", key)
+	}
+	return val
 }
 
 func nameOk(s string) bool {
