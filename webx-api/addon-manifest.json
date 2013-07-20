@@ -10,8 +10,8 @@
       "sso_url": "https://yourapp.com/sso/login"
     },
     "test": {
-      "base_url": "http://localhost:4567/heroku/resources",
-      "sso_url": "http://localhost:4567/sso/login"
+      "base_url": "http://localhost:8080/heroku/resources",
+      "sso_url": "http://localhost:8080/sso/login"
     }
   }
 }
