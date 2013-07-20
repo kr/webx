@@ -6,8 +6,8 @@
     "password": "1f6b91ab99004e5be9d97915fe082596",
     "sso_salt": "95e4be81bae2e82bebb0224807136244",
     "production": {
-      "base_url": "https://yourapp.com/heroku/resources",
-      "sso_url": "https://yourapp.com/sso/login"
+      "base_url": "https://webx.herokuapp.com/heroku/resources",
+      "sso_url": "https://webx.herokuapp.com/sso/login"
     },
     "test": {
       "base_url": "http://localhost:8080/heroku/resources",
