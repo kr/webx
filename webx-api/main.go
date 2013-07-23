@@ -89,11 +89,9 @@ func Create(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("provision", hreq.Options.Name)
 	var out struct {
-		ID     string `json:"id"`
-		Config struct {
-			WEBX_URL string
-		}
-		Message string
+		ID      string                    `json:"id"`
+		Config  struct{ WEBX_URL string } `json:"config"`
+		Message string                    `json:"message"`
 	}
 	out.ID = rands(10)
 	out.Config.WEBX_URL = "https://" + hreq.Options.Name + "@route.webx.io/"
