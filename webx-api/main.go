@@ -152,8 +152,14 @@ func authenticate(r *http.Request) bool {
 }
 
 func nameOk(s string) bool {
-	for _, c := range s {
-		if !('a' <= c && c <= 'z' || '0' <= c && c <= '9') {
+	if len(s) < 1 {
+		return false
+	}
+	if c := s[0]; !('a' <= c && c <= 'z' || '0' <= c && c <= '9') {
+		return false
+	}
+	for _, c := range s[1:] {
+		if !('a' <= c && c <= 'z' || '0' <= c && c <= '9' || c == '-') {
 			return false
 		}
 	}
