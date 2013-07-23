@@ -17,6 +17,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -58,7 +59,11 @@ func main() {
 		verbose = true
 	}
 	for {
-		err = rspdy.DialAndServeTLS("tcp", routerURL.Host, tlsConfig, nil)
+		addr := routerURL.Host
+		if p := strings.LastIndex(addr, ":"); p == -1 {
+			addr += ":https"
+		}
+		err = rspdy.DialAndServeTLS("tcp", addr, tlsConfig, nil)
 		if err != nil {
 			log.Println("DialAndServe:", err)
 			time.Sleep(redialPause)
