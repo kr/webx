@@ -22,7 +22,7 @@ See http://git.io/51G0dQ
 `
 	NoNameMessage = `
 Missing flag --name.
-See See http://git.io/51G0dQ for help.
+See http://git.io/51G0dQ for help.
 `
 )
 
@@ -141,6 +141,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 type J map[string]interface{}
 
 func jsonError(w http.ResponseWriter, message string, code int) {
+	message = strings.TrimSpace(message)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(J{"message": message})
