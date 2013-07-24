@@ -15,10 +15,16 @@ import (
 	"strings"
 )
 
-const ProvisionMessage = `
+const (
+	ProvisionMessage = `
 Congrats on your new domain name.
 See http://git.io/51G0dQ
 `
+	NoNameMessage = `
+Missing flag --name.
+See See http://git.io/51G0dQ for help.
+`
+)
 
 const username = "webx"
 
@@ -84,7 +90,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 	}
 	if !nameOk(hreq.Options.Name) {
 		log.Println("heroku sent invalid name:", err)
-		http.Error(w, "invalid name", 400)
+		jsonError(w, NoNameMessage, 422)
 		return
 	}
 	log.Println("provision", hreq.Options.Name)
@@ -130,6 +136,14 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 
 func Home(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "webx\n")
+}
+
+type J map[string]interface{}
+
+func jsonError(w http.ResponseWriter, message string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(J{"message": message})
 }
 
 type fileHandler string
