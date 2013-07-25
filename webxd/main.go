@@ -12,7 +12,9 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"github.com/kr/rspdy"
+	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -53,6 +55,7 @@ func main() {
 
 	innerURL := &url.URL{Scheme: "http", Host: innerAddr}
 	rp := httputil.NewSingleHostReverseProxy(innerURL)
+	rp.Transport = new(WebsocketTransport)
 	http.Handle("/", LogHandler{rp})
 	http.HandleFunc("backend.webx.io/names", handshake)
 	if os.Getenv("WEBX_VERBOSE") != "" {
@@ -130,4 +133,26 @@ func Infoln(v ...interface{}) {
 	if verbose {
 		log.Println(v...)
 	}
+}
+
+type WebsocketTransport struct{}
+
+func (w WebsocketTransport) Proxy(req *http.Request) (*http.Response, error) {
+	conn, err := net.DialTimeout("tcp", req.URL.Host, 50*time.Millisecond)
+	if err != nil {
+		return nil, err
+	}
+	go io.Copy(conn, req.Body)
+	resp := &http.Response{
+		StatusCode: 200,
+		Body:       conn,
+	}
+	return resp, nil
+}
+
+func (w WebsocketTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Method == "WEBSOCKET" {
+		return w.Proxy(req)
+	}
+	return http.DefaultTransport.RoundTrip(req)
 }

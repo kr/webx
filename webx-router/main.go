@@ -38,8 +38,9 @@ func listenRequests(t *Transport) {
 		Transport: t,
 		Director:  func(*http.Request) {},
 	}
+	handler := &WebsocketProxy{proxy, t}
 	log.Println("listen requests", addr)
-	err := http.ListenAndServe(addr, proxy)
+	err := http.ListenAndServe(addr, handler)
 	if err != nil {
 		log.Fatal("error: frontend ListenAndServe:", err)
 	}
