@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/heroku/webx/keys"
-	"math/big"
 	"os"
 )
 
@@ -21,18 +20,14 @@ func main() {
 	}
 
 	// random number of keys to generate
-	iterationsBig, _ := rand.Int(rand.Reader, big.NewInt(200))
-	iterations := int(iterationsBig.Int64()) + 500
-	fmt.Printf("Generating %d keys...\n", iterations)
+	fmt.Println("Generating keys...")
 
-	var priv *ecdsa.PrivateKey
-	for i := 0; i < iterations; i++ {
-		priv, err = ecdsa.GenerateKey(curve, rand.Reader)
-		if err != nil {
-			fmt.Println("Error generating key:", err)
-			os.Exit(1)
-		}
+	priv, err := ecdsa.GenerateKey(curve, rand.Reader)
+	if err != nil {
+		fmt.Println("Error generating key:", err)
+		os.Exit(1)
 	}
+
 	printKey(priv)
 }
 
