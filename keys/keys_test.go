@@ -2,7 +2,6 @@ package keys
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"math/big"
 	"reflect"
@@ -10,19 +9,19 @@ import (
 )
 
 func TestEncodeDecodePublicKey(t *testing.T) {
-	xstr := "91902829668862169015983137365766418463234730702165833401852203800663795127946"
-	ystr := "71706737214393833266931624628724922581229333163681892523661102756208006988628"
-	expected := "yy8ogru0TNzU4dBEPoNopqlSfYfQ8nBp5kel9HTvVoqeiJMzNqwDFNGmq8Qisy9kcV622G4LzfnT2ylR9s0DVA=="
+	xstr := "3752433171554439267614164748152619388643469309054567599316549718761947465529723419288751913782382747582304433855580769125882294263944376115280908689991506544"
+	ystr := "4152006475681996459286906069233895865610009201015117130302757857770883807111947238111213586760517239268796365966145179647128950410979775566153140254442410978"
+	expected := "ARfeh0abwJUHTINEQ0o7_NxnG8gda3s5AywydxovC3i148GvmCEeRIVNRCuMIuCcB71dEAEngOFc1n_fCefOL5pwATWruOcIlyO65lIqCkAoK3SmpIhSbVnzPsdKkPh2Rwwt61uJYSvtY3JW7gdop4vG3g8-FxETcMMEZGH57vzTUlPi"
 	x, _ := big.NewInt(0).SetString(xstr, 10)
 	y, _ := big.NewInt(0).SetString(ystr, 10)
 
-	k := ecdsa.PublicKey{elliptic.P256(), x, y}
+	k := ecdsa.PublicKey{Curve, x, y}
 	enc := EncodePublicKey(k)
 	if enc != expected {
 		t.Errorf("expected encoding %q got %q", expected, enc)
 	}
 
-	kdec, err := DecodePublicKey(enc, elliptic.P256())
+	kdec, err := DecodePublicKey(enc)
 	if err != nil {
 		t.Errorf("error decoding: %s", err)
 	} else if !reflect.DeepEqual(*kdec, k) {
@@ -31,17 +30,17 @@ func TestEncodeDecodePublicKey(t *testing.T) {
 }
 
 func TestEncodeDecodePrivateKey(t *testing.T) {
-	dstr := "89313698214387454822521149997320673442561542575811640358557629057740883524937"
-	expected := "xXXDA5MP4k-ZqFxyyiaGEeS5zR7tkFkZbG1mrnTmfUk="
+	dstr := "110061533099052216443366667375830438989694075383357356202709338247091019586025948858339719782647856308793524137003493025864000964698410222186380002561296076"
+	expected := "CDVxkUebjoVK4WLI48RODZjmswH-cfRitXVQbpi2ne_xHG8JSuifIoD654zjpWClbMegyvPKXr8En1k2ZETfBsw="
 	d, _ := big.NewInt(0).SetString(dstr, 10)
 
-	k := ecdsa.PrivateKey{PublicKey: ecdsa.PublicKey{Curve: elliptic.P256()}, D: d}
+	k := ecdsa.PrivateKey{PublicKey: ecdsa.PublicKey{Curve: Curve}, D: d}
 	enc := EncodePrivateKey(k)
 	if enc != expected {
 		t.Errorf("expected %q got %q", expected, enc)
 	}
-	
-	kdec, err := DecodePrivateKey(enc, elliptic.P256())
+
+	kdec, err := DecodePrivateKey(enc)
 	if err != nil {
 		t.Errorf("error decoding: %s", err)
 	} else if !reflect.DeepEqual(*kdec, k) {
@@ -75,8 +74,8 @@ func TestEncodeDecodeSignature(t *testing.T) {
 }
 
 func TestSignUser(t *testing.T) {
-	key64 := "4d2028ad91408478bdfb44cfb18d0de7316290e49471ffe58691a5947d12866c"
-	kdec, err := DecodePrivateKey(key64, elliptic.P256())
+	key64 := "CDVxkUebjoVK4WLI48RODZjmswH-cfRitXVQbpi2ne_xHG8JSuifIoD654zjpWClbMegyvPKXr8En1k2ZETfBsw="
+	kdec, err := DecodePrivateKey(key64)
 	if err != nil {
 		t.Errorf("error decoding: %s", err)
 	}
@@ -88,26 +87,27 @@ func TestSignUser(t *testing.T) {
 }
 
 func TestVerifySignedUser(t *testing.T) {
-	curve := elliptic.P256()
-	priv := genTestKey(t, curve)
-	user := "omgwtfbbq"
+	for i := 0; i < 20; i++ {
+		priv := genTestKey(t)
+		user := "omgwtfbbq"
 
-	auth, err := SignUser(user, priv)
-	if err != nil {
-		t.Fatalf("error signing user: %s", err)
-	}
+		auth, err := SignUser(user, priv)
+		if err != nil {
+			t.Fatalf("error signing user: %s", err)
+		}
 
-	success, err := VerifySignedUser(user, auth, &priv.PublicKey)
-	if err != nil {
-		t.Fatalf("error verifying user: %s", err)
-	}
-	if !success {
-		t.Fatalf("verification failed")
+		success, err := VerifySignedUser(user, auth, &priv.PublicKey)
+		if err != nil {
+			t.Fatalf("error verifying user: %s", err)
+		}
+		if !success {
+			t.Fatalf("verification failed (%d)", i)
+		}
 	}
 }
 
-func genTestKey(t *testing.T, curve elliptic.Curve) *ecdsa.PrivateKey {
-	k, err := ecdsa.GenerateKey(curve, rand.Reader)
+func genTestKey(t *testing.T) *ecdsa.PrivateKey {
+	k, err := ecdsa.GenerateKey(Curve, rand.Reader)
 	if err != nil {
 		t.Fatalf("error generating test key: %s", err)
 	}

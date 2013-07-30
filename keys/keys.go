@@ -10,11 +10,17 @@ import (
 	"math/big"
 )
 
+var Curve elliptic.Curve
+
+func init() {
+	Curve = elliptic.P521()
+}
+
 func EncodePublicKey(pub ecdsa.PublicKey) string {
 	return base64.URLEncoding.EncodeToString(append(pub.X.Bytes(), pub.Y.Bytes()...))
 }
 
-func DecodePublicKey(xy64 string, curve elliptic.Curve) (*ecdsa.PublicKey, error) {
+func DecodePublicKey(xy64 string) (*ecdsa.PublicKey, error) {
 	xy, err := base64.URLEncoding.DecodeString(xy64)
 	if err != nil {
 		return nil, err
@@ -22,21 +28,21 @@ func DecodePublicKey(xy64 string, curve elliptic.Curve) (*ecdsa.PublicKey, error
 
 	x := big.NewInt(0).SetBytes(xy[:len(xy)/2])
 	y := big.NewInt(0).SetBytes(xy[len(xy)/2:])
-	return &ecdsa.PublicKey{curve, x, y}, nil
+	return &ecdsa.PublicKey{Curve, x, y}, nil
 }
 
 func EncodePrivateKey(priv ecdsa.PrivateKey) string {
 	return base64.URLEncoding.EncodeToString(priv.D.Bytes())
 }
 
-func DecodePrivateKey(b64 string, curve elliptic.Curve) (*ecdsa.PrivateKey, error) {
+func DecodePrivateKey(b64 string) (*ecdsa.PrivateKey, error) {
 	z, err := base64.URLEncoding.DecodeString(b64)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ecdsa.PrivateKey{
-		PublicKey: ecdsa.PublicKey{Curve: curve},
+		PublicKey: ecdsa.PublicKey{Curve: Curve},
 		D:         big.NewInt(0).SetBytes(z),
 	}, nil
 }
@@ -74,20 +80,4 @@ func VerifySignedUser(user, signature string, pub *ecdsa.PublicKey) (bool, error
 	}
 
 	return ecdsa.Verify(pub, sha512.New().Sum([]byte(user)), r, s), nil
-}
-
-func ParseCurveBits(bits int) (curve elliptic.Curve, err error) {
-	switch bits {
-	case 224:
-		curve = elliptic.P224()
-	case 256:
-		curve = elliptic.P256()
-	case 384:
-		curve = elliptic.P384()
-	case 521:
-		curve = elliptic.P521()
-	default:
-		return nil, fmt.Errorf("invalid bitsize: %d", bits)
-	}
-	return curve, nil
 }

@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 )
 
@@ -37,19 +36,10 @@ func main() {
 	}
 	password = mustGetenv("HEROKU_PASSWORD")
 
-	// load elliptic curve
-	ecdsaBits, err := strconv.Atoi(mustGetenv("ECDSA_BITS"))
-	if err != nil {
-		log.Fatalf("invalid ECDSA_BITS")
-	}
-	curve, err := keys.ParseCurveBits(ecdsaBits)
-	if err != nil {
-		log.Fatalf("invalid ECDSA curve size: %s", err)
-	}
-
 	// load private signing key
 	privKeyStr := mustGetenv("ECDSA_PRIVATE_KEY")
-	signingKey, err = keys.DecodePrivateKey(privKeyStr, curve)
+	var err error
+	signingKey, err = keys.DecodePrivateKey(privKeyStr)
 	if err != nil {
 		log.Fatalf("error loading signing key: %s", err)
 	}
