@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/kr/spdy"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -44,11 +45,22 @@ func (t *Transport) Remove(name string, c *spdy.Conn) {
 }
 
 func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
-	name := strings.TrimSuffix(r.Host, ".webxapp.io")
+	name := strings.TrimSuffix(basehost(r.Host), ".webxapp.io")
 	g := t.Lookup(name)
 	if g == nil {
 		return &http.Response{StatusCode: 503, Body: empty}, nil
 	}
 	log.Println("roundtrip", name)
 	return g.RoundTrip(r)
+}
+
+func basehost(hostport string) string {
+	if !strings.Contains(hostport, ":") {
+		return hostport
+	}
+	host, _, err := net.SplitHostPort(hostport)
+	if err != nil {
+		return hostport
+	}
+	return host
 }
