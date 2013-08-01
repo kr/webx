@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/kr/fernet"
 	"github.com/kr/rspdy"
 	"github.com/kr/spdy"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
+	"time"
 )
 
 const (
@@ -18,10 +20,16 @@ const (
 	keyFile        = "route.webx.io.key.pem"
 )
 
-var empty emptyReadCloser
+var (
+	empty      emptyReadCloser
+	fernetKeys []*fernet.Key
+)
 
 func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
+
+	fernetKeys = fernet.MustDecodeKeys(mustGetenv("FERNET_KEY"))
+
 	t := &Transport{tab: make(map[string]*Group)}
 	go listenBackends(t)
 	go listenRequests(t)
@@ -95,7 +103,17 @@ func handshakeBackend(c *spdy.Conn, t *Transport) {
 			}
 			return
 		}
-		// TODO(kr): authenticate command as discussed
+		msg := fernet.VerifyAndDecrypt([]byte(cmd.Password), time.Hour*24*365, fernetKeys)
+		if msg == nil {
+			// auth failed
+			log.Println("error: auth verification failure, name:", cmd.Name)
+			return
+		} else if token := string(msg); token != cmd.Name {
+			// Name does not match verified Fernet token
+			log.Printf("error: auth verification mismatch: name=%q token=%q\n", cmd.Name, token)
+			return
+		}
+
 		switch cmd.Op {
 		case "add":
 			log.Println("add", cmd.Name)
@@ -124,8 +142,9 @@ func handshakeBackend(c *spdy.Conn, t *Transport) {
 }
 
 type BackendCommand struct {
-	Op   string // "add" or "remove"
-	Name string // e.g. "foo" for foo.webxapp.io
+	Op       string // "add" or "remove"
+	Name     string // e.g. "foo" for foo.webxapp.io
+	Password string
 }
 
 type emptyReadCloser int
@@ -136,4 +155,12 @@ func (e emptyReadCloser) Read(p []byte) (int, error) {
 
 func (e emptyReadCloser) Close() error {
 	return nil
+}
+
+func mustGetenv(key string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		log.Fatalf("must set env %s", key)
+	}
+	return val
 }
