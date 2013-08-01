@@ -45,7 +45,8 @@ func main() {
 
 	handshake := func(w http.ResponseWriter, r *http.Request) {
 		webxName := routerURL.User.Username()
-		cmd := BackendCommand{"add", webxName}
+		password, _ := routerURL.User.Password()
+		cmd := BackendCommand{"add", webxName, password}
 		err = json.NewEncoder(w).Encode(cmd)
 		if err != nil {
 			log.Fatal("handshake:", err)
@@ -125,8 +126,9 @@ func mustSanityCheckURL(u *url.URL) {
 }
 
 type BackendCommand struct {
-	Op   string // "add" or "remove"
-	Name string // e.g. "foo" for foo.webxapp.io
+	Op       string // "add" or "remove"
+	Name     string // e.g. "foo" for foo.webxapp.io
+	Password string
 }
 
 func Infoln(v ...interface{}) {
