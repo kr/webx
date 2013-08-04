@@ -156,5 +156,15 @@ func (w WebsocketTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	if req.Method == "WEBSOCKET" {
 		return w.Proxy(req)
 	}
+	return DefaultTransport.RoundTrip(req)
+}
+
+// Transport is like http.Transport but it sets Close to true on all requests.
+type Transport struct{}
+
+var DefaultTransport = new(Transport)
+
+func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Close = true
 	return http.DefaultTransport.RoundTrip(req)
 }
