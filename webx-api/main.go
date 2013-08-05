@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"github.com/gorilla/mux"
+	"github.com/kr/fernet"
 	"io"
 	"log"
 	"net/http"
@@ -28,14 +29,24 @@ See http://git.io/51G0dQ for help.
 
 const username = "webx"
 
-var password string
+var (
+	fernetKey *fernet.Key
+	password string
+)
 
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	password = os.Getenv("HEROKU_PASSWORD")
+	password = mustGetenv("HEROKU_PASSWORD")
+
+	var err error
+	fernetKey, err = fernet.DecodeKey(mustGetenv("FERNET_KEY"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	r := NewRouter()
 	http.ListenAndServe(":"+port, r)
 }
@@ -93,6 +104,12 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, NoNameMessage, 422)
 		return
 	}
+	sig, err := fernet.EncryptAndSign([]byte(hreq.Options.Name), fernetKey)
+	if err != nil {
+		log.Println("error signing app name:", err)
+		w.WriteHeader(500)
+	}
+
 	log.Println("provision", hreq.Options.Name)
 	var out struct {
 		ID      string                    `json:"id"`
@@ -100,7 +117,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		Message string                    `json:"message"`
 	}
 	out.ID = rands(10)
-	out.Config.WEBX_URL = "https://" + hreq.Options.Name + "@route.webx.io/"
+	out.Config.WEBX_URL = "https://" + hreq.Options.Name + ":" + string(sig) + "@route.webx.io/"
 	out.Message = hreq.Options.Name + ".webxapp.io\n" + ProvisionMessage
 	w.WriteHeader(201)
 	err = json.NewEncoder(w).Encode(out)
@@ -164,6 +181,14 @@ func authenticate(r *http.Request) bool {
 	}
 	userpass := strings.SplitN(string(dec), ":", 2)
 	return len(userpass) == 2 && userpass[0] == username || userpass[1] == password
+}
+
+func mustGetenv(key string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		log.Fatalf("must set env %s", key)
+	}
+	return val
 }
 
 func nameOk(s string) bool {
