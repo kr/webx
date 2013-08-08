@@ -56,7 +56,7 @@ func NewRouter() *mux.Router {
 	if err != nil {
 		log.Fatal(err)
 	}
-	routerPath, err := exec.LookPath("webx-router")
+	routerPath, err := exec.LookPath("urouter")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func NewRouter() *mux.Router {
 	r.HandleFunc("/", Home).Methods("GET", "HEAD")
 	r.Handle("/dyno-profile.sh", fileHandler("webxd/dyno-profile.sh")).Methods("GET", "HEAD")
 	r.Handle("/webxd", fileHandler(webxdPath)).Methods("GET", "HEAD")
-	r.Handle("/webx-router", fileHandler(routerPath)).Methods("GET", "HEAD")
+	r.Handle("/urouter", fileHandler(routerPath)).Methods("GET", "HEAD")
 	return r
 }
 

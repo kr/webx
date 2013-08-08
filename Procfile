@@ -1,2 +1,2 @@
-web: webx-api
-router: webx-router
+web: uapi
+router: urouter
