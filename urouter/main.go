@@ -28,7 +28,11 @@ var (
 func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 
-	fernetKeys = fernet.MustDecodeKeys(mustGetenv("FERNET_KEY"))
+	var err error
+	fernetKeys, err = fernet.DecodeKeys(mustGetenv("FERNET_KEY"))
+	if err != nil {
+		log.Fatal("FERNET_KEY contains invalid keys: ", err)
+	}
 
 	t := &Transport{tab: make(map[string]*Group)}
 	go listenBackends(t)
