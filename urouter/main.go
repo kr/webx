@@ -41,7 +41,8 @@ func main() {
 	d := &Directory{tab: make(map[string]*Group)}
 	t := &Transport{
 		Director: d.Lookup,
-		ErrCode:  503,
+		ErrCode:  404,
+		ErrBody:  "no such app",
 	}
 	go listenBackends(d)
 	go listenRequests(t)
