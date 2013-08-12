@@ -26,7 +26,7 @@ const (
 
 var (
 	empty      emptyReadCloser
-	fernetKeys []*fernet.Key
+	fernetKeys []*fernet.Key // FERNET_KEY
 )
 
 func main() {
