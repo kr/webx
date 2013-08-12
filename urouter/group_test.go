@@ -11,7 +11,7 @@ func TestGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal("unexpected error", err)
 	}
-	g := new(Group)
+	g := NewGroup()
 	rt := g.Lookup(req)
 	if rt != nil {
 		t.Fatalf("rt = %v want nil", rt)
@@ -27,5 +27,20 @@ func TestGroup(t *testing.T) {
 	rt = g.Lookup(req)
 	if rt != nil {
 		t.Fatalf("rt = %v want nil", rt)
+	}
+}
+
+func TestEmptyGroup(t *testing.T) {
+	req, err := http.NewRequest("GET", "http://example.com/", nil)
+	if err != nil {
+		t.Fatal("unexpected error", err)
+	}
+	g := NewGroup()
+	resp, err := g.RoundTrip(req)
+	if err != nil {
+		t.Fatal("unexpected error", err)
+	}
+	if resp.StatusCode != 503 {
+		t.Errorf("StatusCode = %d want 503", resp.StatusCode)
 	}
 }

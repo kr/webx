@@ -27,7 +27,7 @@ func (d *Directory) Make(name string) *Group {
 	if g := d.tab[name]; g != nil {
 		return g
 	}
-	g := new(Group)
+	g := NewGroup()
 	d.tab[name] = g
 	return g
 }

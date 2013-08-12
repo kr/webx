@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/kr/spdy"
-	"log"
 	"math/rand"
 	"net/http"
 	"sync"
@@ -11,15 +10,14 @@ import (
 type Group struct {
 	backends []*spdy.Conn
 	mu       sync.RWMutex
+
+	Transport
 }
 
-func (g *Group) RoundTrip(r *http.Request) (*http.Response, error) {
-	rt := g.Lookup(r)
-	if rt == nil {
-		return &http.Response{StatusCode: 503, Body: empty}, nil
-	}
-	log.Println("spdy roundtrip", r.Host)
-	return rt.RoundTrip(r)
+func NewGroup() *Group {
+	g := new(Group)
+	g.Transport = Transport{g.Lookup, 503, "no backends"}
+	return g
 }
 
 func (g *Group) Lookup(r *http.Request) http.RoundTripper {
