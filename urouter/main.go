@@ -14,10 +14,14 @@ import (
 )
 
 const (
-	defRequestAddr = ":8000" // REQADDR
-	defBackendAddr = ":4444" // BKDADDR
-	certFile       = "route.webx.io.crt.pem"
-	keyFile        = "route.webx.io.key.pem"
+	defRequestAddr    = ":8000" // REQADDR
+	defRequestTLSAddr = ":4443" // REQTLSADDR
+	defBackendAddr    = ":1111" // BKDADDR
+
+	innerCertFile = "inner.crt"
+	innerKeyFile  = "inner.key"
+	outerCertFile = "outer.crt"
+	outerKeyFile  = "outer.key"
 )
 
 var (
@@ -41,20 +45,37 @@ func main() {
 }
 
 func listenRequests(t *Transport) {
-	// TODO(kr): TLS
-	addr := os.Getenv("REQADDR")
-	if addr == "" {
-		addr = defRequestAddr
-	}
 	proxy := &httputil.ReverseProxy{
 		Transport: t,
 		Director:  func(*http.Request) {},
 	}
 	handler := &WebsocketProxy{proxy, t}
+	go listenHTTP(handler)
+	go listenHTTPS(handler)
+}
+
+func listenHTTP(handler http.Handler) {
+	addr := os.Getenv("REQADDR")
+	if addr == "" {
+		addr = defRequestAddr
+	}
 	log.Println("listen requests", addr)
 	err := http.ListenAndServe(addr, handler)
 	if err != nil {
 		log.Fatal("error: frontend ListenAndServe:", err)
+	}
+	panic("unreached")
+}
+
+func listenHTTPS(handler http.Handler) {
+	addr := os.Getenv("REQTLSADDR")
+	if addr == "" {
+		addr = defRequestTLSAddr
+	}
+	log.Println("listen requests tls", addr)
+	err := http.ListenAndServeTLS(addr, outerCertFile, outerKeyFile, handler)
+	if err != nil {
+		log.Fatal("error: frontend ListenAndServeTLS:", err)
 	}
 	panic("unreached")
 }
@@ -65,7 +86,7 @@ func listenBackends(t *Transport) {
 		addr = defBackendAddr
 	}
 	log.Println("listen backends", addr)
-	l, err := rspdy.ListenTLS(addr, certFile, keyFile)
+	l, err := rspdy.ListenTLS(addr, innerCertFile, innerKeyFile)
 	if err != nil {
 		log.Fatal(err)
 	}
