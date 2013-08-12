@@ -25,7 +25,6 @@ const (
 )
 
 var (
-	empty      emptyReadCloser
 	fernetKeys []*fernet.Key // FERNET_KEY
 )
 
@@ -179,16 +178,6 @@ type BackendCommand struct {
 	Op       string // "add" or "remove"
 	Name     string // e.g. "foo" for foo.webxapp.io
 	Password string
-}
-
-type emptyReadCloser int
-
-func (e emptyReadCloser) Read(p []byte) (int, error) {
-	return 0, io.EOF
-}
-
-func (e emptyReadCloser) Close() error {
-	return nil
 }
 
 func mustGetenv(key string) string {
