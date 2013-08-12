@@ -14,16 +14,22 @@ type Group struct {
 }
 
 func (g *Group) RoundTrip(r *http.Request) (*http.Response, error) {
-	g.mu.RLock()
-	if len(g.backends) == 0 {
-		g.mu.RUnlock()
+	rt := g.Lookup(r)
+	if rt == nil {
 		return &http.Response{StatusCode: 503, Body: empty}, nil
 	}
-	// TODO(kr): do something smarter than rand
-	c := g.backends[rand.Intn(len(g.backends))]
-	g.mu.RUnlock()
 	log.Println("spdy roundtrip", r.Host)
-	return c.RoundTrip(r)
+	return rt.RoundTrip(r)
+}
+
+func (g *Group) Lookup(r *http.Request) http.RoundTripper {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	if len(g.backends) == 0 {
+		return nil
+	}
+	// TODO(kr): do something smarter than rand
+	return g.backends[rand.Intn(len(g.backends))]
 }
 
 func (g *Group) Add(c *spdy.Conn) {
