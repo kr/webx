@@ -116,7 +116,9 @@ func handshakeBackend(c *spdy.Conn, dir *Directory) {
 	defer func() {
 		for _, s := range names {
 			log.Println("remove", s)
-			dir.Remove(s, c)
+			if g := dir.Get(s); g != nil {
+				g.Remove(c)
+			}
 		}
 	}()
 	d := json.NewDecoder(resp.Body)
@@ -155,7 +157,9 @@ func handshakeBackend(c *spdy.Conn, dir *Directory) {
 			}
 		case "remove":
 			log.Println("remove", cmd.Name)
-			dir.Remove(cmd.Name, c)
+			if g := dir.Get(cmd.Name); g != nil {
+				g.Remove(c)
+			}
 			var a []string
 			for i := range names {
 				if names[i] != cmd.Name {
