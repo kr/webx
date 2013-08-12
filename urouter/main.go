@@ -39,7 +39,10 @@ func main() {
 	}
 
 	d := &Directory{tab: make(map[string]*Group)}
-	t := &Transport{Director: d.Lookup}
+	t := &Transport{
+		Director: d.Lookup,
+		ErrCode:  503,
+	}
 	go listenBackends(d)
 	go listenRequests(t)
 	select {}
