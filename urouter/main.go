@@ -38,8 +38,9 @@ func main() {
 		log.Fatal("FERNET_KEY contains invalid keys: ", err)
 	}
 
-	t := &Transport{tab: make(map[string]*Group)}
-	go listenBackends(t)
+	d := &Directory{tab: make(map[string]*Group)}
+	t := &Transport{Director: d.Lookup}
+	go listenBackends(d)
 	go listenRequests(t)
 	select {}
 }
@@ -80,7 +81,7 @@ func listenHTTPS(handler http.Handler) {
 	panic("unreached")
 }
 
-func listenBackends(t *Transport) {
+func listenBackends(dir *Directory) {
 	addr := os.Getenv("BKDADDR")
 	if addr == "" {
 		addr = defBackendAddr
@@ -96,11 +97,11 @@ func listenBackends(t *Transport) {
 			log.Println("accept spdy", err)
 			continue
 		}
-		go handshakeBackend(c, t)
+		go handshakeBackend(c, dir)
 	}
 }
 
-func handshakeBackend(c *spdy.Conn, t *Transport) {
+func handshakeBackend(c *spdy.Conn, dir *Directory) {
 	client := &http.Client{Transport: c}
 	resp, err := client.Get("https://backend.webx.io/names")
 	if err != nil {
@@ -115,7 +116,7 @@ func handshakeBackend(c *spdy.Conn, t *Transport) {
 	defer func() {
 		for _, s := range names {
 			log.Println("remove", s)
-			t.Remove(s, c)
+			dir.Remove(s, c)
 		}
 	}()
 	d := json.NewDecoder(resp.Body)
@@ -142,7 +143,7 @@ func handshakeBackend(c *spdy.Conn, t *Transport) {
 		switch cmd.Op {
 		case "add":
 			log.Println("add", cmd.Name)
-			t.Make(cmd.Name).Add(c)
+			dir.Make(cmd.Name).Add(c)
 			found := false
 			for _, s := range names {
 				if s == cmd.Name {
@@ -154,7 +155,7 @@ func handshakeBackend(c *spdy.Conn, t *Transport) {
 			}
 		case "remove":
 			log.Println("remove", cmd.Name)
-			t.Remove(cmd.Name, c)
+			dir.Remove(cmd.Name, c)
 			var a []string
 			for i := range names {
 				if names[i] != cmd.Name {
