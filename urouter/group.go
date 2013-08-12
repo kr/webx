@@ -55,7 +55,3 @@ func (g *Group) Remove(c *spdy.Conn) {
 	}
 	g.backends = b
 }
-
-type Backend struct {
-	c *spdy.Conn
-}
