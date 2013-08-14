@@ -18,13 +18,30 @@ import (
 
 const (
 	ProvisionMessage = `
-Congrats on your new domain name.
-See http://git.io/51G0dQ
+
+Getting started with Webx
+
+1. Install the addon
+
+	$ heroku addons:add webx --name myname
+
+This creates myname.webxapp.io pointing to your app.
+
+2. Drop this profile script in .profile.d/webx.sh,
+
+	eval "$(curl -s https://webx.herokuapp.com/dyno-profile.sh)"
+
+and deploy your app.
+
+Now you should be able to access your app on your shiny new
+webxapp.io domain name.
+
+Enjoy!
+
 `
 	NoNameMessage = `
 Missing flag --name.
-See http://git.io/51G0dQ for help.
-`
+` + ProvisionMessage
 )
 
 const username = "webx"
