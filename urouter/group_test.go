@@ -1,46 +1,57 @@
 package main
 
 import (
-	"github.com/kr/spdy"
 	"net/http"
 	"testing"
 )
 
-func TestGroup(t *testing.T) {
-	req, err := http.NewRequest("GET", "http://example.com/", nil)
-	if err != nil {
-		t.Fatal("unexpected error", err)
+var backend = NewBackend(nil)
+
+func TestGroupPick(t *testing.T) {
+	var cases = []struct {
+		g *Group
+		b *Backend
+	}{
+		{&Group{}, nil},
+		{&Group{backends: []*Backend{backend}}, backend},
 	}
-	g := NewGroup()
-	rt := g.Lookup(req)
-	if rt != nil {
-		t.Fatalf("rt = %v want nil", rt)
-	}
-	c := new(spdy.Conn)
-	g.Add(c)
-	rt = g.Lookup(req)
-	if gc, ok := rt.(*spdy.Conn); !ok || gc != c {
-		t.Errorf("ok = false want true")
-		t.Fatalf("gc = %p want %p", gc, c)
-	}
-	g.Remove(c)
-	rt = g.Lookup(req)
-	if rt != nil {
-		t.Fatalf("rt = %v want nil", rt)
+
+	req := new(http.Request)
+	for _, test := range cases {
+		b := test.g.pick(req)
+		if b != test.b {
+			t.Errorf("b = %v want %v", b, test.b)
+		}
 	}
 }
 
-func TestEmptyGroup(t *testing.T) {
-	req, err := http.NewRequest("GET", "http://example.com/", nil)
-	if err != nil {
-		t.Fatal("unexpected error", err)
+func TestGroupAdd(t *testing.T) {
+	g := new(Group)
+	b := NewBackend(nil)
+	g.Add(b)
+	if n := len(g.backends); n != 1 {
+		t.Fatalf("len(g.backends) = %d want 1", n)
 	}
-	g := NewGroup()
-	resp, err := g.RoundTrip(req)
-	if err != nil {
-		t.Fatal("unexpected error", err)
+	if gotb := g.backends[0]; gotb != b {
+		t.Fatalf("gotb = %p want %p", gotb, b)
 	}
-	if resp.StatusCode != 503 {
-		t.Errorf("StatusCode = %d want 503", resp.StatusCode)
+}
+
+func TestGroupRemove(t *testing.T) {
+	b := NewBackend(nil)
+	g := &Group{backends: []*Backend{b}}
+	g.Remove(b)
+	if n := len(g.backends); n != 0 {
+		t.Fatalf("len(g.backends) = %d want 0", n)
+	}
+}
+
+func TestGroupEmptyResp(t *testing.T) {
+	req := new(http.Request)
+	g := new(Group)
+	w := new(resp)
+	g.ServeHTTP(w, req)
+	if w.code != 503 {
+		t.Errorf("code = %d want 503", w.code)
 	}
 }
