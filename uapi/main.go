@@ -48,7 +48,7 @@ const username = "webx"
 
 var (
 	fernetKey *fernet.Key
-	password string
+	password  string
 )
 
 func main() {
