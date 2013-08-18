@@ -38,24 +38,10 @@ func main() {
 	}
 
 	d := &Directory{tab: make(map[string]*Group)}
-	t := &Transport{
-		Director: d.Lookup,
-		ErrCode:  404,
-		ErrBody:  "no such app",
-	}
 	go listenBackends(d)
-	go listenRequests(t)
+	go listenHTTP(d)
+	go listenHTTPS(d)
 	select {}
-}
-
-func listenRequests(t *Transport) {
-	proxy := &httputil.ReverseProxy{
-		Transport: t,
-		Director:  func(*http.Request) {},
-	}
-	handler := &WebsocketProxy{proxy, t}
-	go listenHTTP(handler)
-	go listenHTTPS(handler)
 }
 
 func listenHTTP(handler http.Handler) {
@@ -100,13 +86,41 @@ func listenBackends(dir *Directory) {
 			log.Println("accept spdy", err)
 			continue
 		}
-		go handshakeBackend(c, dir)
+		b := NewBackend(c)
+		go b.Handshake(dir)
 	}
 }
 
-func handshakeBackend(c *spdy.Conn, dir *Directory) {
-	client := &http.Client{Transport: c}
-	resp, err := client.Get("https://backend.webx.io/names")
+func mustGetenv(key string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		log.Fatalf("must set env %s", key)
+	}
+	return val
+}
+
+type Backend struct {
+	conn   *spdy.Conn
+	client http.Client
+	proxy  httputil.ReverseProxy
+	WebsocketProxy
+}
+
+func NewBackend(c *spdy.Conn) *Backend {
+	b := new(Backend)
+	b.conn = c
+	b.client.Transport = c
+	b.proxy.Transport = c
+	b.proxy.Director = NopDirector
+	b.WebsocketProxy.handler = &b.proxy
+	b.WebsocketProxy.transport = c
+	return b
+}
+
+func NopDirector(*http.Request) {}
+
+func (b *Backend) Handshake(dir *Directory) {
+	resp, err := b.client.Get("https://backend.webx.io/names")
 	if err != nil {
 		log.Println("error: get backend names:", err)
 		return
@@ -120,12 +134,16 @@ func handshakeBackend(c *spdy.Conn, dir *Directory) {
 		for _, s := range names {
 			log.Println("remove", s)
 			if g := dir.Get(s); g != nil {
-				g.Remove(c)
+				g.Remove(b)
 			}
 		}
 	}()
 	d := json.NewDecoder(resp.Body)
-	var cmd BackendCommand
+	var cmd struct {
+		Op       string // "add" or "remove"
+		Name     string // e.g. "foo" for foo.webxapp.io
+		Password string
+	}
 	for {
 		err := d.Decode(&cmd)
 		if err != nil {
@@ -148,7 +166,7 @@ func handshakeBackend(c *spdy.Conn, dir *Directory) {
 		switch cmd.Op {
 		case "add":
 			log.Println("add", cmd.Name)
-			dir.Make(cmd.Name).Add(c)
+			dir.Make(cmd.Name).Add(b)
 			found := false
 			for _, s := range names {
 				if s == cmd.Name {
@@ -161,7 +179,7 @@ func handshakeBackend(c *spdy.Conn, dir *Directory) {
 		case "remove":
 			log.Println("remove", cmd.Name)
 			if g := dir.Get(cmd.Name); g != nil {
-				g.Remove(c)
+				g.Remove(b)
 			}
 			var a []string
 			for i := range names {
@@ -172,18 +190,4 @@ func handshakeBackend(c *spdy.Conn, dir *Directory) {
 			names = a
 		}
 	}
-}
-
-type BackendCommand struct {
-	Op       string // "add" or "remove"
-	Name     string // e.g. "foo" for foo.webxapp.io
-	Password string
-}
-
-func mustGetenv(key string) string {
-	val := os.Getenv(key)
-	if val == "" {
-		log.Fatalf("must set env %s", key)
-	}
-	return val
 }

@@ -13,9 +13,9 @@ func TestDirectory(t *testing.T) {
 	if g != nil {
 		t.Fatalf("g = %v want nil", g)
 	}
-	rt := d.Lookup(req)
-	if rt != nil {
-		t.Fatalf("rt = %v want nil", rt)
+	g = d.pick(req)
+	if g != nil {
+		t.Fatalf("g = %v want nil", g)
 	}
 
 	w := d.Make(name)
@@ -23,9 +23,17 @@ func TestDirectory(t *testing.T) {
 	if g != w {
 		t.Fatalf("g = %v want %v", g, w)
 	}
-	rt = d.Lookup(req)
-	if g, ok := rt.(*Group); !ok || g != w {
-		t.Errorf("ok = %v want true", ok)
+	g = d.pick(req)
+	if g != w {
 		t.Fatalf("g = %v want %v", g, w)
+	}
+}
+
+func TestDirectoryEmptyResp(t *testing.T) {
+	d := &Directory{tab: make(map[string]*Group)}
+	w := new(resp)
+	d.ServeHTTP(w, &http.Request{Host: "foo.webxapp.io"})
+	if w.code != 404 {
+		t.Errorf("code = %d want 404", w.code)
 	}
 }

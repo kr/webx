@@ -1,26 +1,27 @@
 package main
 
 import (
-	"github.com/kr/spdy"
+	"io"
 	"math/rand"
 	"net/http"
 	"sync"
 )
 
 type Group struct {
-	backends []*spdy.Conn
+	backends []*Backend
 	mu       sync.RWMutex
-
-	Transport
 }
 
-func NewGroup() *Group {
-	g := new(Group)
-	g.Transport = Transport{g.Lookup, 503, "no backends"}
-	return g
+func (g *Group) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if b := g.pick(r); b != nil {
+		b.ServeHTTP(w, r)
+	} else {
+		w.WriteHeader(503)
+		io.WriteString(w, "no backends")
+	}
 }
 
-func (g *Group) Lookup(r *http.Request) http.RoundTripper {
+func (g *Group) pick(r *http.Request) *Backend {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	if len(g.backends) == 0 {
@@ -30,26 +31,25 @@ func (g *Group) Lookup(r *http.Request) http.RoundTripper {
 	return g.backends[rand.Intn(len(g.backends))]
 }
 
-func (g *Group) Add(c *spdy.Conn) {
+func (g *Group) Add(b *Backend) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	for _, b := range g.backends {
-		if b == c {
+	for _, b1 := range g.backends {
+		if b1 == b {
 			return
 		}
 	}
-	g.backends = append(g.backends, c)
+	g.backends = append(g.backends, b)
 }
 
-func (g *Group) Remove(c *spdy.Conn) {
+func (g *Group) Remove(b *Backend) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	a := g.backends
-	var b []*spdy.Conn
-	for i := range a {
-		if a[i] != c {
-			b = append(b, a[i])
+	var a []*Backend
+	for _, b1 := range g.backends {
+		if b1 != b {
+			a = append(a, b1)
 		}
 	}
-	g.backends = b
+	g.backends = a
 }

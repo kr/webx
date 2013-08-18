@@ -56,5 +56,6 @@ func (p *WebsocketProxy) Proxy(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(conn, "Connection: close\r\n\r\n")
 		return
 	}
+	defer resp.Body.Close()
 	io.Copy(conn, resp.Body)
 }
