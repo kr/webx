@@ -21,6 +21,8 @@ func (g *Group) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// pick chooses a single Backend in g for r.
+// If there are no known backends, pick returns nil.
 func (g *Group) pick(r *http.Request) *Backend {
 	g.mu.RLock()
 	defer g.mu.RUnlock()

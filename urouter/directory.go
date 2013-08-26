@@ -22,6 +22,8 @@ func (d *Directory) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// pick chooses the appropriate Group for r, based on the Host
+// header field. If there is no such Group, pick returns nil.
 func (d *Directory) pick(r *http.Request) *Group {
 	name := strings.TrimSuffix(basehost(r.Host), ".webxapp.io")
 	return d.Get(name)
