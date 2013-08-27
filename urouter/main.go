@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base32"
 	"github.com/kr/fernet"
 	"github.com/kr/rspdy"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -34,8 +37,9 @@ func main() {
 
 	d := &Directory{tab: make(map[string]*Group)}
 	go listenBackends(d)
-	go listenHTTP(d)
-	go listenHTTPS(d)
+	h := idHandler(d)
+	go listenHTTP(h)
+	go listenHTTPS(h)
 	select {}
 }
 
@@ -92,4 +96,26 @@ func mustGetenv(key string) string {
 		log.Fatalf("must set env %s", key)
 	}
 	return val
+}
+
+// idHandler ensures each incoming request has a request ID
+// in header field ID. If the field is already present, it is
+// left alone; otherwise, idHandler generates a new random
+// string.
+func idHandler(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := r.Header["Id"]; !ok {
+			r.Header.Set("Id", randID())
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
+func randID() string {
+	const n = 15
+	b := make([]byte, n)
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		log.Fatal("randID", err)
+	}
+	return base32.StdEncoding.EncodeToString(b)
 }
