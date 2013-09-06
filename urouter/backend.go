@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/kr/fernet"
+	"github.com/fernet/fernet-go"
 	"github.com/kr/spdy"
 	"io"
 	"log"

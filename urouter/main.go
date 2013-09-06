@@ -3,7 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"encoding/base32"
-	"github.com/kr/fernet"
+	"github.com/fernet/fernet-go"
 	"github.com/kr/rspdy"
 	"io"
 	"log"

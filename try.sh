@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-go get github.com/kr/fernet/fernet-sign
+go get github.com/fernet/fernet-go/fernet-sign
 go get github.com/kr/webx/...
 
 export FERNET_KEY=`dd if=/dev/urandom bs=1 count=32 2>/dev/null|openssl base64`
