@@ -79,6 +79,7 @@ func NewRouter() *mux.Router {
 	}
 
 	r := mux.NewRouter()
+	r.HandleFunc("/rendezvous-token", CreateRendezvous).Methods("GET")
 	r.HandleFunc("/heroku/resources", Create).Methods("POST")
 	r.HandleFunc("/heroku/resources/{id}", Put).Methods("PUT")
 	r.HandleFunc("/heroku/resources/{id}", Delete).Methods("DELETE")
@@ -142,6 +143,26 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		log.Println("error sending response to heroku:", err)
 		http.Error(w, "internal error", 500)
 	}
+}
+
+// CreateRendezvous produces a rendezvous token.
+// It's like provisioning a normal addon resource, except:
+//   - no privileges are necessary; anyone can get one
+//   - we generate the name
+//   - we keep no persistent state (e.g. custom domains)
+// Clients use this to run a one-off dyno that listens
+// for a single incoming request.
+func CreateRendezvous(w http.ResponseWriter, r *http.Request) {
+	name := rands(20)
+	sig, err := fernet.EncryptAndSign([]byte(name), fernetKey)
+	if err != nil {
+		log.Println("error signing app name:", err)
+		http.Error(w, "internal error", 500)
+		return
+	}
+	w.WriteHeader(201)
+	url := "https://" + name + ":" + string(sig) + "@route.webx.io/"
+	io.WriteString(w, url)
 }
 
 func Put(w http.ResponseWriter, r *http.Request) {
