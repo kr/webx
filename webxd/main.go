@@ -10,8 +10,7 @@ package main
 
 import (
 	"crypto/tls"
-	"encoding/json"
-	"github.com/kr/rspdy"
+	"github.com/kr/webx"
 	"io"
 	"log"
 	"net"
@@ -19,7 +18,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -36,38 +34,15 @@ var tlsConfig = &tls.Config{
 func main() {
 	log.SetFlags(0)
 	log.SetPrefix("webxd: ")
-	innerAddr := ":" + os.Getenv("PORT")
-	routerURL, err := url.Parse(os.Getenv("WEBX_URL"))
-	if err != nil {
-		log.Fatal("parse url:", err)
-	}
-	mustSanityCheckURL(routerURL)
-
-	handshake := func(w http.ResponseWriter, r *http.Request) {
-		webxName := routerURL.User.Username()
-		password, _ := routerURL.User.Password()
-		cmd := BackendCommand{"add", webxName, password}
-		err = json.NewEncoder(w).Encode(cmd)
-		if err != nil {
-			log.Fatal("handshake:", err)
-		}
-		select {}
-	}
-
-	innerURL := &url.URL{Scheme: "http", Host: innerAddr}
+	innerURL := &url.URL{Scheme: "http", Host: ":" + os.Getenv("PORT")}
 	rp := httputil.NewSingleHostReverseProxy(innerURL)
 	rp.Transport = new(WebsocketTransport)
 	http.Handle("/", LogHandler{rp})
-	http.HandleFunc("backend.webx.io/names", handshake)
 	if os.Getenv("WEBX_VERBOSE") != "" {
 		verbose = true
 	}
 	for {
-		addr := routerURL.Host
-		if p := strings.LastIndex(addr, ":"); p == -1 {
-			addr += ":https"
-		}
-		err = rspdy.DialAndServeTLS("tcp", addr, tlsConfig, nil)
+		err := webx.DialAndServeTLS(os.Getenv("WEBX_URL"), tlsConfig, nil)
 		if err != nil {
 			log.Println("DialAndServe:", err)
 			time.Sleep(redialPause)
@@ -105,30 +80,6 @@ func (w *LogResponseWriter) log(code int) {
 		w.logged = true
 		Infoln(code, w.r.Host, w.r.URL.Path)
 	}
-}
-
-func mustSanityCheckURL(u *url.URL) {
-	if u.User == nil {
-		log.Fatal("url has no userinfo")
-	}
-	if u.Scheme != "https" {
-		log.Fatal("scheme must be https")
-	}
-	if u.Path != "/" {
-		log.Fatal("path must be /")
-	}
-	if u.RawQuery != "" {
-		log.Fatal("query must be empty")
-	}
-	if u.Fragment != "" {
-		log.Fatal("fragment must be empty")
-	}
-}
-
-type BackendCommand struct {
-	Op       string // "add" or "remove"
-	Name     string // e.g. "foo" for foo.webxapp.io
-	Password string
 }
 
 func Infoln(v ...interface{}) {
