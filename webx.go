@@ -38,14 +38,14 @@ func DialAndServeTLS(url string, tlsConfig *tls.Config, h http.Handler) error {
 	if h == nil {
 		h = http.DefaultServeMux
 	}
-	var mux http.ServeMux
+	mux := http.NewServeMux()
 	mux.Handle("/", h)
 	mux.HandleFunc("backend.webx.io/names", handshake)
 	addr := u.Host
 	if !strings.Contains(addr, ":") {
 		addr += ":https"
 	}
-	return rspdy.DialAndServeTLS("tcp", addr, tlsConfig, &mux)
+	return rspdy.DialAndServeTLS("tcp", addr, tlsConfig, mux)
 }
 
 type Command struct {
