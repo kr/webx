@@ -6,11 +6,11 @@
 # If we exit, the dyno will crash.
 
 case "$DYNO" in
-web.*) ;;
-*    ) return ;;
+web.*) mode=web ;;
+*    ) mode=mon ;;
 esac
 set -e
 
 curl -so /tmp/webxd https://webx.herokuapp.com/webxd
 chmod +x /tmp/webxd
-/tmp/webxd &
+/tmp/webxd $mode &

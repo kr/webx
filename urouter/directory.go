@@ -2,12 +2,15 @@ package main
 
 import (
 	"crypto/tls"
+	"encoding/base64"
+	"github.com/fernet/fernet-go"
 	"github.com/kr/spdy"
 	"io"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Directory struct {
@@ -68,4 +71,37 @@ func basehost(hostport string) string {
 		return hostport
 	}
 	return host
+}
+
+func (d *Directory) Monitor(w http.ResponseWriter, r *http.Request) {
+	_, tok := basicAuth(r.Header.Get("Authorization"))
+	name := fernet.VerifyAndDecrypt([]byte(tok), time.Hour*24*365, fernetKeys)
+	if name == nil {
+		http.Error(w, "yo unauthorized", http.StatusUnauthorized)
+		return
+	}
+	g := d.Get(string(name))
+	if g == nil {
+		http.NotFound(w, r)
+		return
+	}
+	r.Host = "backend.webx.io"
+	r.URL.Host = r.Host
+	g.Monitor(w, r)
+}
+
+func basicAuth(h string) (username, password string) {
+	if !strings.HasPrefix(h, "Basic ") {
+		return
+	}
+	h = strings.TrimPrefix(h, "Basic ")
+	b, err := base64.StdEncoding.DecodeString(h)
+	if err != nil {
+		return
+	}
+	s := string(b)
+	if p := strings.Index(s, ":"); p > -1 {
+		return s[:p], s[p+1:]
+	}
+	return s, ""
 }

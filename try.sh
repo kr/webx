@@ -12,6 +12,7 @@ export BKDADDR=:1111
 export PORT=5000
 export WEBX_URL="https://foo:$TOK@127.0.0.1:1111/"
 export WEBX_VERBOSE=1
+export DYNO=web.1
 
 urouter &
 webxd &

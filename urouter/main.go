@@ -77,7 +77,9 @@ func listenBackends(dir *Directory) {
 		srv.Addr = defBackendAddr
 	}
 	log.Println("listen backends", srv.Addr)
-	srv.Handler = http.NewServeMux()
+	mux := http.NewServeMux()
+	mux.HandleFunc("api.webx.io/mon/", dir.Monitor)
+	srv.Handler = mux
 	srv.TLSConfig = &tls.Config{
 		NextProtos: []string{"spdy/3", "rspdy/3", "http/1.1"},
 	}

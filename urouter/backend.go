@@ -52,7 +52,7 @@ func (b *Backend) Handshake(dir *Directory) {
 	}()
 	d := json.NewDecoder(resp.Body)
 	var cmd struct {
-		Op    string // "add" or "remove"
+		Op    string // e.g. "add" or "remove"
 		Token string `json:"Password"`
 	}
 	for {
@@ -72,6 +72,12 @@ func (b *Backend) Handshake(dir *Directory) {
 		switch cmd.Op {
 		case "add":
 			log.Println("add", name)
+			g := dir.Make(name)
+			g.Add(b)
+			g.AddRoute(b)
+			names = append(names, name)
+		case "mon":
+			log.Println("mon", name)
 			dir.Make(name).Add(b)
 			names = append(names, name)
 		case "remove":

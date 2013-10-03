@@ -13,12 +13,12 @@ func TestGroupPick(t *testing.T) {
 		b *Backend
 	}{
 		{&Group{}, nil},
-		{&Group{backends: []*Backend{backend}}, backend},
+		{&Group{routable: []*Backend{backend}}, backend},
 	}
 
 	req := new(http.Request)
 	for _, test := range cases {
-		b := test.g.pick(req)
+		b := test.g.route(req)
 		if b != test.b {
 			t.Errorf("b = %v want %v", b, test.b)
 		}
@@ -37,12 +37,27 @@ func TestGroupAdd(t *testing.T) {
 	}
 }
 
+func TestGroupAddRoute(t *testing.T) {
+	g := new(Group)
+	b := NewBackend(nil)
+	g.AddRoute(b)
+	if n := len(g.routable); n != 1 {
+		t.Fatalf("len(g.routable) = %d want 1", n)
+	}
+	if gotb := g.routable[0]; gotb != b {
+		t.Fatalf("gotb = %p want %p", gotb, b)
+	}
+}
+
 func TestGroupRemove(t *testing.T) {
 	b := NewBackend(nil)
-	g := &Group{backends: []*Backend{b}}
+	g := &Group{backends: []*Backend{b}, routable: []*Backend{b}}
 	g.Remove(b)
 	if n := len(g.backends); n != 0 {
-		t.Fatalf("len(g.backends) = %d want 0", n)
+		t.Errorf("len(g.backends) = %d want 0", n)
+	}
+	if n := len(g.routable); n != 0 {
+		t.Errorf("len(g.routable) = %d want 0", n)
 	}
 }
 

@@ -18,6 +18,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"os/exec"
 	"time"
 )
 
@@ -25,7 +26,10 @@ const (
 	redialPause = 2 * time.Second
 )
 
-var verbose bool
+var (
+	verbose bool
+	dyno    = os.Getenv("DYNO")
+)
 
 var tlsConfig = &tls.Config{
 	InsecureSkipVerify: true,
@@ -34,10 +38,20 @@ var tlsConfig = &tls.Config{
 func main() {
 	log.SetFlags(0)
 	log.SetPrefix("webxd: ")
-	innerURL := &url.URL{Scheme: "http", Host: ":" + os.Getenv("PORT")}
-	rp := httputil.NewSingleHostReverseProxy(innerURL)
-	rp.Transport = new(WebsocketTransport)
-	http.Handle("/", LogHandler{rp})
+	mode := "web"
+	if len(os.Args) > 1 {
+		mode = os.Args[1]
+	}
+	switch mode {
+	case "web":
+		innerURL := &url.URL{Scheme: "http", Host: ":" + os.Getenv("PORT")}
+		rp := httputil.NewSingleHostReverseProxy(innerURL)
+		rp.Transport = new(WebsocketTransport)
+		http.Handle("/", LogHandler{rp})
+		http.HandleFunc("backend.webx.io/mon/ps", ListProc)
+	case "mon":
+		http.HandleFunc("backend.webx.io/mon/ps", ListProc)
+	}
 	if os.Getenv("WEBX_VERBOSE") != "" {
 		verbose = true
 	}
@@ -45,6 +59,7 @@ func main() {
 		err := webx.DialAndServeTLS(os.Getenv("WEBX_URL"), tlsConfig, nil)
 		if err != nil {
 			log.Println("DialAndServe:", err)
+			log.Println("DialAndServe:", os.Getenv("WEBX_URL"))
 			time.Sleep(redialPause)
 		}
 	}
@@ -118,4 +133,16 @@ var DefaultTransport = new(Transport)
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Close = true
 	return http.DefaultTransport.RoundTrip(req)
+}
+
+func ListProc(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Dyno", dyno)
+	out, err := exec.Command("ps", "-ef").Output()
+	if err != nil {
+		w.WriteHeader(500)
+		io.WriteString(w, err.Error()+"\n")
+		return
+	}
+	w.WriteHeader(200)
+	w.Write(out)
 }
