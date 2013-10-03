@@ -6,14 +6,13 @@ import (
 	"errors"
 	"net/http"
 	neturl "net/url"
-	"os"
 	"strings"
 
 	"github.com/kr/rspdy"
 )
 
 func DialAndServeTLS(url string, tlsConfig *tls.Config, h http.Handler) error {
-	u, err := neturl.Parse(os.Getenv("RUNX_URL"))
+	u, err := neturl.Parse(url)
 	if err != nil {
 		return err
 	}
