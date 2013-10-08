@@ -73,27 +73,26 @@ func (b *Backend) Handshake(dir *Directory) {
 		case "add":
 			log.Println("add", name)
 			dir.Make(name).Add(b)
-			found := false
-			for _, s := range names {
-				if s == name {
-					found = true
-				}
-			}
-			if !found {
-				names = append(names, name)
-			}
+			names = append(names, name)
 		case "remove":
 			log.Println("remove", name)
 			if g := dir.Get(name); g != nil {
 				g.Remove(b)
 			}
-			var a []string
-			for i := range names {
-				if names[i] != name {
-					a = append(a, names[i])
-				}
-			}
-			names = a
+			names = stringsRemove(names, name)
 		}
 	}
+}
+
+// stringsRemove destructively removes elements of a that
+// equal s and returns the resulting slice.
+func stringsRemove(a []string, s string) []string {
+	i := 0
+	for _, t := range a {
+		if t != s {
+			a[i] = t
+			i++
+		}
+	}
+	return a[:i]
 }
