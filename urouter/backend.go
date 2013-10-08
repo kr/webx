@@ -53,7 +53,6 @@ func (b *Backend) Handshake(dir *Directory) {
 	d := json.NewDecoder(resp.Body)
 	var cmd struct {
 		Op       string // "add" or "remove"
-		Name     string // e.g. "foo" for foo.webxapp.io
 		Password string
 	}
 	for {
@@ -66,36 +65,31 @@ func (b *Backend) Handshake(dir *Directory) {
 		}
 		msg := fernet.VerifyAndDecrypt([]byte(cmd.Password), time.Hour*24*365, fernetKeys)
 		if msg == nil {
-			// auth failed
-			log.Println("error: auth verification failure, name:", cmd.Name)
-			return
-		} else if token := string(msg); token != cmd.Name {
-			// Name does not match verified Fernet token
-			log.Printf("error: auth verification mismatch: name=%q token=%q\n", cmd.Name, token)
-			return
+			return // unauthorized
 		}
 
+		name := string(msg)
 		switch cmd.Op {
 		case "add":
-			log.Println("add", cmd.Name)
-			dir.Make(cmd.Name).Add(b)
+			log.Println("add", name)
+			dir.Make(name).Add(b)
 			found := false
 			for _, s := range names {
-				if s == cmd.Name {
+				if s == name {
 					found = true
 				}
 			}
 			if !found {
-				names = append(names, cmd.Name)
+				names = append(names, name)
 			}
 		case "remove":
-			log.Println("remove", cmd.Name)
-			if g := dir.Get(cmd.Name); g != nil {
+			log.Println("remove", name)
+			if g := dir.Get(name); g != nil {
 				g.Remove(b)
 			}
 			var a []string
 			for i := range names {
-				if names[i] != cmd.Name {
+				if names[i] != name {
 					a = append(a, names[i])
 				}
 			}
