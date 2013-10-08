@@ -2,9 +2,10 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/base32"
 	"github.com/fernet/fernet-go"
-	"github.com/kr/rspdy"
+	"github.com/kr/spdy"
 	"io"
 	"log"
 	"net/http"
@@ -70,23 +71,22 @@ func listenHTTPS(handler http.Handler) {
 }
 
 func listenBackends(dir *Directory) {
-	addr := os.Getenv("BKDADDR")
-	if addr == "" {
-		addr = defBackendAddr
+	var srv spdy.Server
+	srv.Addr = os.Getenv("BKDADDR")
+	if srv.Addr == "" {
+		srv.Addr = defBackendAddr
 	}
-	log.Println("listen backends", addr)
-	l, err := rspdy.ListenTLS(addr, innerCertFile, innerKeyFile)
+	log.Println("listen backends", srv.Addr)
+	srv.Handler = http.NewServeMux()
+	srv.TLSConfig = &tls.Config{
+		NextProtos: []string{"spdy/3", "rspdy/3", "http/1.1"},
+	}
+	srv.TLSNextProto = map[string]func(*http.Server, *tls.Conn, http.Handler){
+		"rspdy/3": dir.ServeRSPDY,
+	}
+	err := srv.ListenAndServeTLS(innerCertFile, innerKeyFile)
 	if err != nil {
 		log.Fatal(err)
-	}
-	for {
-		c, err := l.AcceptSPDY()
-		if err != nil {
-			log.Println("accept spdy", err)
-			continue
-		}
-		b := NewBackend(c)
-		go b.Handshake(dir)
 	}
 }
 

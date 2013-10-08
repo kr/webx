@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/tls"
+	"github.com/kr/spdy"
 	"io"
 	"net"
 	"net/http"
@@ -20,6 +22,14 @@ func (d *Directory) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
 		io.WriteString(w, "no such app")
 	}
+}
+
+// ServeRSPDY serves an incoming RSPDY connection.
+// It makes a new backend to represent the conn,
+// then starts the handshake process.
+func (d *Directory) ServeRSPDY(s *http.Server, c *tls.Conn, h http.Handler) {
+	b := NewBackend(&spdy.Conn{Conn: c})
+	b.Handshake(d)
 }
 
 // pick chooses the appropriate Group for r, based on the Host
