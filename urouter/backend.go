@@ -52,8 +52,8 @@ func (b *Backend) Handshake(dir *Directory) {
 	}()
 	d := json.NewDecoder(resp.Body)
 	var cmd struct {
-		Op       string // "add" or "remove"
-		Password string
+		Op    string // "add" or "remove"
+		Token string `json:"Password"`
 	}
 	for {
 		err := d.Decode(&cmd)
@@ -63,7 +63,7 @@ func (b *Backend) Handshake(dir *Directory) {
 			}
 			return
 		}
-		msg := fernet.VerifyAndDecrypt([]byte(cmd.Password), time.Hour*24*365, fernetKeys)
+		msg := fernet.VerifyAndDecrypt([]byte(cmd.Token), time.Hour*24*365, fernetKeys)
 		if msg == nil {
 			return // unauthorized
 		}
