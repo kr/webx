@@ -6,6 +6,7 @@ import (
 	"github.com/kr/spdy"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"time"
@@ -16,6 +17,7 @@ type Backend struct {
 	client http.Client
 	proxy  httputil.ReverseProxy
 	ws     WebsocketProxy
+	ipauth IPAuth // optional in chain of handlers
 	http.Handler
 }
 
@@ -27,6 +29,7 @@ func NewBackend(c *spdy.Conn) *Backend {
 	b.proxy.Director = NopDirector
 	b.ws.handler = &b.proxy
 	b.ws.transport = c
+	b.ipauth.handler = &b.ws
 	b.Handler = &b.ws
 	return b
 }
@@ -54,6 +57,7 @@ func (b *Backend) Handshake(dir *Directory) {
 	var cmd struct {
 		Op    string // e.g. "web" or "mon"
 		Token string
+		OkIPs []net.IP
 	}
 	for {
 		err := d.Decode(&cmd)
@@ -72,6 +76,10 @@ func (b *Backend) Handshake(dir *Directory) {
 		switch cmd.Op {
 		case "web":
 			log.Println("web", name)
+			if len(cmd.OkIPs) > 0 {
+				b.ipauth.addrs = cmd.OkIPs
+				b.Handler = &b.ipauth
+			}
 			g := dir.Make(name)
 			g.Add(b)
 			g.AddRoute(b)
