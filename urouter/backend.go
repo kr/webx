@@ -15,7 +15,8 @@ type Backend struct {
 	conn   *spdy.Conn
 	client http.Client
 	proxy  httputil.ReverseProxy
-	WebsocketProxy
+	ws     WebsocketProxy
+	http.Handler
 }
 
 func NewBackend(c *spdy.Conn) *Backend {
@@ -24,8 +25,9 @@ func NewBackend(c *spdy.Conn) *Backend {
 	b.client.Transport = c
 	b.proxy.Transport = c
 	b.proxy.Director = NopDirector
-	b.WebsocketProxy.handler = &b.proxy
-	b.WebsocketProxy.transport = c
+	b.ws.handler = &b.proxy
+	b.ws.transport = c
+	b.Handler = &b.ws
 	return b
 }
 
