@@ -48,18 +48,27 @@ func main() {
 		rp := httputil.NewSingleHostReverseProxy(innerURL)
 		rp.Transport = new(WebsocketTransport)
 		http.Handle("/", LogHandler{rp})
-		http.HandleFunc("backend.webx.io/mon/ps", ListProc)
+		fallthrough
 	case "mon":
 		http.HandleFunc("backend.webx.io/mon/ps", ListProc)
+	default:
+		log.Fatal("invalid mode:", mode)
 	}
 	if os.Getenv("WEBX_VERBOSE") != "" {
 		verbose = true
 	}
+	srv := &webx.Server{
+		TLSClientConfig: tlsConfig,
+	}
+	err := webx.ParseURL(srv, os.Getenv("WEBX_URL"))
+	if err != nil {
+		log.Fatal("ParseURL:", err)
+	}
+	srv.Op = mode
 	for {
-		err := webx.DialAndServeTLS(os.Getenv("WEBX_URL"), tlsConfig, nil)
+		err := srv.DialAndServeTLS()
 		if err != nil {
 			log.Println("DialAndServe:", err)
-			log.Println("DialAndServe:", os.Getenv("WEBX_URL"))
 			time.Sleep(redialPause)
 		}
 	}

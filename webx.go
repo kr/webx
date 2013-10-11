@@ -11,7 +11,21 @@ import (
 	"github.com/kr/rspdy"
 )
 
-func DialAndServeTLS(url string, tlsConfig *tls.Config, h http.Handler) error {
+type Server struct {
+	Addr    string       // Address to dial
+	Token   string       // Fernet token to provide in the handshake
+	Op      string       // "web" or "mon"
+	Handler http.Handler // Handler to invoke, http.DefaultServeMux if nil
+
+	// TLSClientConfig specifies the TLS configuration to use with
+	// tls.Client. If nil, the default configuration is used.
+	TLSClientConfig *tls.Config
+}
+
+// ParseURL parses url and sets s.Addr, s.Token, and s.Op
+// from the URL's password, host, and path fields. The URL
+// must use scheme https.
+func ParseURL(s *Server, url string) error {
 	u, err := neturl.Parse(url)
 	if err != nil {
 		return err
@@ -22,10 +36,17 @@ func DialAndServeTLS(url string, tlsConfig *tls.Config, h http.Handler) error {
 	if u.Scheme != "https" {
 		return errors.New("scheme must be https")
 	}
+	s.Addr = u.Host
+	if !strings.Contains(s.Addr, ":") {
+		s.Addr += ":https"
+	}
+	s.Token, _ = u.User.Password()
+	s.Op = strings.Trim(u.Path, "/")
+	return nil
+}
 
-	name := u.User.Username()
-	password, _ := u.User.Password()
-	cmd, err := json.Marshal(Command{"add", name, password})
+func (s *Server) DialAndServeTLS() error {
+	cmd, err := json.Marshal(command{s.Op, s.Token})
 	if err != nil {
 		return err
 	}
@@ -33,22 +54,17 @@ func DialAndServeTLS(url string, tlsConfig *tls.Config, h http.Handler) error {
 		w.Write(cmd)
 		select {}
 	}
-
+	h := s.Handler
 	if h == nil {
 		h = http.DefaultServeMux
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/", h)
 	mux.HandleFunc("backend.webx.io/names", handshake)
-	addr := u.Host
-	if !strings.Contains(addr, ":") {
-		addr += ":https"
-	}
-	return rspdy.DialAndServeTLS("tcp", addr, tlsConfig, mux)
+	return rspdy.DialAndServeTLS("tcp", s.Addr, s.TLSClientConfig, mux)
 }
 
-type Command struct {
-	Op       string // "add" or "remove"
-	Name     string // e.g. "foo" for foo.webxapp.io
-	Password string
+type command struct {
+	Op    string // "web" or "mon"
+	Token string
 }
