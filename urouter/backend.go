@@ -41,18 +41,16 @@ func (b *Backend) Handshake(dir *Directory) {
 		log.Println("error: get backend names http status", resp.Status)
 		return
 	}
-	var names []string
+	var name string
 	defer func() {
-		for _, s := range names {
-			log.Println("remove", s)
-			if g := dir.Get(s); g != nil {
-				g.Remove(b)
-			}
+		log.Println("remove", name)
+		if g := dir.Get(name); g != nil {
+			g.Remove(b)
 		}
 	}()
 	d := json.NewDecoder(resp.Body)
 	var cmd struct {
-		Op    string // e.g. "add" or "remove"
+		Op    string // e.g. "add" or "mon"
 		Token string `json:"Password"`
 	}
 	for {
@@ -68,24 +66,16 @@ func (b *Backend) Handshake(dir *Directory) {
 			return // unauthorized
 		}
 
-		name := string(msg)
+		name = string(msg)
 		switch cmd.Op {
 		case "add":
 			log.Println("add", name)
 			g := dir.Make(name)
 			g.Add(b)
 			g.AddRoute(b)
-			names = append(names, name)
 		case "mon":
 			log.Println("mon", name)
 			dir.Make(name).Add(b)
-			names = append(names, name)
-		case "remove":
-			log.Println("remove", name)
-			if g := dir.Get(name); g != nil {
-				g.Remove(b)
-			}
-			names = stringsRemove(names, name)
 		}
 	}
 }
